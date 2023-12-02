@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/db/reads.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/db/reads.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { ObjectID } from "bson";
+import {
+  getCommentsCollection,
+  getDreamsCollection,
+  getInboxCollection,
+  getStarsCollection,
+  getUsersCollection,
+} from "../mongodb";
+import { logError } from "../o11y";
+import { decryptDream } from "../transformations";
+
+/**
+ * @private
+ */
+export async function getDreamById(dreamId) {
+  const collection = await getDreamsCollection();
+
+  const cursor = collection.find({ _id: ObjectID(dreamId) }).limit(1);
+
+  const result = await cursor.toArray();
+
+  await cursor.close();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  const data = result[0];
+
+  if (data.visibility === "private") {
+    const decryptedDream = decryptDream(data.dream);
+
+    return {
+      ...data,
+      dream: decryptedDream,
+    };
+  }
+
+  return data;
+}
+
+/**
+ * @private
+ */
+export async function getDreams(userEmail) {
+  const [user, collection] = await Promise.all([
+    getUserByEmail(userEmail),
+    getDreamsCollection(),
+  ]);
+
+  const cursor = collection
+    .find({ userId: ObjectID(user._id) })
+    .sort({ _id: -1 })
+    .limit(200);
+
+  const rawResult = await cursor.toArray();
+
+  await cursor.close();
+
+  if (rawResult.lenght === 0) {
+    return null;
+  }
+
+  const result = [];
+
+  for (let data of rawResult) {
+    if (data.visibility === "private") {
+      data = {
+        ...data,
+        dream: decryptDream(data.dream),
+      };
+    }
+
+    result.push(data);
+  }
+
+  return result;
+}
+
+/**
+ * @private
+ */
+export async function getDreamRecords(userEmail) {
+  const [user, collection] = await Promise.all([
+    getUserByEmail(userEmail),
+    getDreamsCollection(),
+  ]);
+
+  const cursor = collection
+    .find({ userId: ObjectID(user._id) })
+    .sort({ _id: -1 })
+    .limit(200);
+
+  const rawResult = await cursor.toArray();
+
+  await cursor.close();
+
+  if (rawResult.lenght === 0) {
+    return null;
+  }
+
+  const result = [];
+
+  for (let data of rawResult) {
+    result.push({
+      createdAt: data.createdAt,
+      dreamId: data._id,
+      wordFrequency: data.wordFrequency,
+      characterCount: data.characterCount,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * @public
+ */
+export async function getLatestPublicDreams() {
+  const collection = await getDreamsCollection();
+
+  const cursor = collection
+    .find({ visibility: { $in: ["public", "anonymous"] } })
+    .sort({ _id: -1 })
+    .limit(200);
+
+  const result = await cursor.toArray();
+
+  await cursor.close();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result;
+}
+
+/**
+ * @public
+ */
+export async function getUserByEmail(userEmail) {
+  const collection = await getUsersCollection();
+
+  const cursor = collection.find({ email: userEmail }).limit(1);
+
+  const result = await cursor.toArray();
+
+  await cursor.close();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result[0];
+}
+
+/**
+ * @public
+ */
+export async function getUserById(userId) {
+  const collection = await getUsersCollection();
+
+  const cursor = collection.find({ _id: ObjectID(userId) }).limit(1);
+
+  const result = await cursor.toArray();
+
+  await cursor.close();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result[0];
+}
+
+export async function searchDreams(query) {
+  const collection = await getDreamsCollection();
+
+  const result = await collection
+    .aggregate([
+      {
+        $search: {
+          index: "default",
+          text: {
+            query,
+            fuzzy: {
+              maxExpansions: 10,
+              prefixLength: 3,
+            },
+            path: "dream.text",
+          },
+        },
+      },
+    ])
+    .toArray();
+
+  return result;
+}
+
+export async function getComments(dreamId) {
+  const [collection, dream] = await Promise.all([
+    getCommentsCollection(),
+    getDreamById(dreamId),
+  ]);
+
+  if (!dream) {
+    logError({
+      name: "Dream miss",
+      message: "No dream found to append comment",
+    });
+
+    return;
+  }
+
+  const cursor = collection
+    .find({ dreamId: ObjectID(dreamId) })
+    .sort({ _id: 1 });
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result;
+}
+
+export async function getCommentsByUserId(userId) {
+  const collection = await getCommentsCollection();
+
+  const cursor = collection
+    .find({ userId: ObjectID(userId) })
+    .sort({ _id: -1 });
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result;
+}
+
+export async function getStars(dreamId) {
+  const [collection, dream] = await Promise.all([
+    getStarsCollection(),
+    getDreamById(dreamId),
+  ]);
+
+  if (!dream) {
+    logError({
+      name: "Dream miss",
+      message: "No dream found to star",
+    });
+
+    return;
+  }
+
+  const cursor = collection
+    .find({ dreamId: ObjectID(dreamId) })
+    .sort({ _id: 1 });
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result;
+}
+
+export async function getStarsByUserEmail(userEmail) {
+  const collection = await getStarsCollection();
+
+  const cursor = collection.find({ userEmail }).sort({ _id: -1 });
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result;
+}
+
+/**
+ * @private
+ */
+export async function getStarredDreams(userEmail) {
+  const stars = await getStarsByUserEmail(userEmail);
+
+  const dreams = await Promise.all(
+    stars.map((star) => getDreamById(star.dreamId))
+  );
+
+  if (dreams.lenght === 0) {
+    return null;
+  }
+
+  return dreams.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// TODO: transform this into a searchUsers method
+export async function getUsers() {
+  const collection = await getUsersCollection();
+
+  const cursor = collection.find({}).sort({ _id: -1 }).limit(200);
+
+  const result = await cursor.toArray();
+
+  await cursor.close();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+}
+
+/**
+ * @private
+ */
+export async function getInbox(userEmail) {
+  const collection = await getInboxCollection();
+
+  const cursor = collection
+    .find({ dreamOwnerUserEmail: userEmail })
+    .sort({ _id: -1 });
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  return result;
+}
+
+/**
+ * @private
+ */
+export async function getInboxCount(userEmail) {
+  const collection = await getInboxCollection();
+
+  const result = await collection
+    .find({ dreamOwnerUserEmail: userEmail, read: false })
+    .count();
+
+  return result;
+}
+
+/**
+ * @private
+ */
+export async function getCommentById(commentId) {
+  const collection = await getCommentsCollection();
+
+  const cursor = collection.find({ _id: ObjectID(commentId) }).limit(1);
+
+  const result = await cursor.toArray();
+
+  await cursor.close();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  const data = result[0];
+
+  return data;
+}
+
+/**
+ * @private
+ */
+export async function getStar(userEmail, dreamId) {
+  const collection = await getStarsCollection();
+
+  const cursor = collection
+    .find({ userEmail: userEmail, dreamId: ObjectID(dreamId) })
+    .limit(1);
+
+  const result = await cursor.toArray();
+
+  await cursor.close();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  const data = result[0];
+
+  return data;
+}
+
+export async function hasCommentedOnDream(userName, dreamId) {
+  const collection = await getCommentsCollection();
+
+  return (
+    (await collection
+      .find({ userName: userName, dreamId: ObjectID(dreamId) })
+      .count()) > 0
+  );
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#post">post</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 02 2023 21:37:55 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

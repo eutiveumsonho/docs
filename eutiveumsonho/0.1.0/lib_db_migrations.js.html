@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/db/migrations.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/db/migrations.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { ObjectID } from "bson";
+import { getInsights } from "../insights";
+import { getDreamsCollection } from "../mongodb";
+import { decryptDream } from "../transformations";
+import { hasCommentedOnDream } from "./reads";
+import { generateComment } from "./writes";
+
+/**
+ * @dataCorrection
+ */
+export async function addMissingWordFreqData() {
+  const collection = await getDreamsCollection();
+
+  const cursor = collection.find();
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  const privateDeams = result.filter((data) => data.visibility === "private");
+  const publicDreams = result.filter((data) => data.visibility !== "private");
+
+  await Promise.all([
+    ...privateDeams.map((data) => {
+      const decrypted = decryptDream(data.dream);
+      const insights = getInsights(decrypted.text);
+
+      collection.updateOne(
+        {
+          _id: ObjectID(data._id),
+        },
+        {
+          $set: insights,
+        }
+      );
+    }),
+    ...publicDreams.map((data) => {
+      const insights = getInsights(data.dream.text);
+      collection.updateOne(
+        {
+          _id: ObjectID(data._id),
+        },
+        {
+          $set: insights,
+        }
+      );
+    }),
+  ]);
+
+  await cursor.close();
+
+  return result;
+}
+
+/**
+ * @dataCorrection
+ */
+export async function addMissingAICommentData() {
+  const collection = await getDreamsCollection();
+
+  const cursor = collection.find();
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  const privateDeams = result.filter((data) => data.visibility === "private");
+  const publicDreams = result.filter((data) => data.visibility !== "private");
+
+  await Promise.all([
+    ...privateDeams.map(async (data) => {
+      const hasCommented = await hasCommentedOnDream("Sonio", data.dream._id);
+
+      if (!hasCommented) {
+        const decrypted = decryptDream(data.dream);
+        const dreamOwner = await getUserById(data.dream.userId);
+        return generateComment(data.dream._id, decrypted, {
+          user: {
+            email: dreamOwner.email,
+          },
+        });
+      }
+    }),
+    ...publicDreams.map(async (data) => {
+      const hasCommented = await hasCommentedOnDream("Sonio", data.dream._id);
+
+      if (!hasCommented) {
+        const dreamOwner = await getUserById(data.dream.userId);
+        return generateComment(data.dream._id, decrypted, {
+          user: {
+            email: dreamOwner.email,
+          },
+        });
+      }
+    }),
+  ]);
+
+  await cursor.close();
+
+  return result;
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#post">post</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 02 2023 21:37:55 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

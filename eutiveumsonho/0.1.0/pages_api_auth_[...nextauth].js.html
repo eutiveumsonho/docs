@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/api/auth/[...nextauth].js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/api/auth/[...nextauth].js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import NextAuth from "next-auth";
+// import FacebookProvider from "next-auth/providers/facebook";
+import GoogleProvider from "next-auth/providers/google";
+import EmailProvider from "next-auth/providers/email";
+import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
+import clientPromise from "../../../lib/mongodb";
+import { createTransport } from "nodemailer";
+import { html } from "../../../lib/email";
+import { ALLOWED_HOST, BRAND_HEX } from "../../../lib/config";
+import { withTracing } from "../../../lib/middleware";
+
+const i18n = (url) => ({
+  pt: {
+    mainContent: `&lt;p>Aqui está um link para entrar no Eu tive um sonho.&lt;/p>
+    &lt;p>Esse link só pode ser utilizado uma vez e expira depois de 24 horas.&lt;/p>
+    &lt;p>Caso o link tenha expirado, por favor tente entrar novamente, &lt;a href="${ALLOWED_HOST}">clicando aqui&lt;/a>&lt;/p>
+&lt;tr>
+  &lt;td align="center" style="padding: 20px 0;">
+    &lt;table border="0" cellspacing="0" cellpadding="0">
+      &lt;tr>
+        &lt;td align="center" style="border-radius: 5px;" bgcolor="${BRAND_HEX}">&lt;a href="${url}"
+            target="_blank"
+            style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: white; text-decoration: none; border-radius: 5px; padding: 10px 20px; display: inline-block; font-weight: bold;">Entrar agora&lt;/a>&lt;/td>
+      &lt;/tr>
+    &lt;/table>
+  &lt;/td>
+&lt;/tr>`,
+    title: "Entrar no Eu tive um sonho",
+    footerContent: "&lt;p>Se você não solicitou este e-mail, pode ignorá-lo.&lt;/p>",
+  },
+  en: {
+    mainContent: `&lt;p>Here's a link to sign in to Eu tive um sonho.&lt;/p>
+    &lt;p>This link can only be used once and expires after 24 hours.&lt;/p>
+    &lt;p>If the link has expired, please try to sign in again, &lt;a href="${ALLOWED_HOST}">click here&lt;/a>&lt;/p>
+&lt;tr>
+  &lt;td align="center" style="padding: 20px 0;">
+    &lt;table border="0" cellspacing="0" cellpadding="0">
+      &lt;tr>
+        &lt;td align="center" style="border-radius: 5px;" bgcolor="${BRAND_HEX}">&lt;a href="${url}"
+            target="_blank"
+            style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: white; text-decoration: none; border-radius: 5px; padding: 10px 20px; display: inline-block; font-weight: bold;">Sign in&lt;/a>&lt;/td>
+      &lt;/tr>
+    &lt;/table>
+  &lt;/td>
+&lt;/tr>`,
+    title: "Sign in to Eu tive um sonho",
+    footerContent:
+      "&lt;p>If you did not request this email, you can ignore it.&lt;/p>",
+  },
+  es: {
+    mainContent: `&lt;p>Aquí tienes un enlace para entrar a Eu tive um sonho.&lt;/p>
+    &lt;p>Este enlace solo puede ser utilizado una vez y expira después de 24 horas.&lt;/p>
+    &lt;p>Si el enlace ha expirado, por favor intenta ingresar nuevamente, &lt;a href="${ALLOWED_HOST}">haz clic aquí&lt;/a>&lt;/p>
+&lt;tr>
+  &lt;td align="center" style="padding: 20px 0;">
+    &lt;table border="0" cellspacing="0" cellpadding="0">
+      &lt;tr>
+        &lt;td align="center" style="border-radius: 5px;" bgcolor="${BRAND_HEX}">&lt;a href="${url}"
+            target="_blank"
+            style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: white; text-decoration: none; border-radius: 5px; padding: 10px 20px; display: inline-block; font-weight: bold;">Entrar ahora&lt;/a>&lt;/td>
+      &lt;/tr>
+    &lt;/table>
+  &lt;/td>
+&lt;/tr>`,
+    title: "Entrar a Eu tive um sonho",
+    footerContent:
+      "&lt;p>Si no solicitaste este correo electrónico, puedes ignorarlo.&lt;/p>",
+  },
+  fr: {
+    mainContent: `&lt;p>Voici un lien pour vous connecter à Eu tive um sonho.&lt;/p>
+    &lt;p>Ce lien ne peut être utilisé qu'une fois et expire après 24 heures.&lt;/p>
+    &lt;p>Si le lien a expiré, veuillez essayer de vous reconnecter, &lt;a href="${ALLOWED_HOST}">cliquez ici&lt;/a>&lt;/p>
+&lt;tr>
+  &lt;td align="center" style="padding: 20px 0;">
+    &lt;table border="0" cellspacing="0" cellpadding="0">
+      &lt;tr>
+        &lt;td align="center" style="border-radius: 5px;" bgcolor="${BRAND_HEX}">&lt;a href="${url}"
+            target="_blank"
+            style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: white; text-decoration: none; border-radius: 5px; padding: 10px 20px; display: inline-block; font-weight: bold;">Se connecter&lt;/a>&lt;/td>
+      &lt;/tr>
+    &lt;/table>
+  &lt;/td>
+&lt;/tr>`,
+    title: "Se connecter à Eu tive um sonho",
+    footerContent:
+      "&lt;p>Si vous n'avez pas demandé cet e-mail, vous pouvez l'ignorer.&lt;/p>",
+  },
+});
+
+function extractLocaleFromQueryString(queryString) {
+  const match = queryString.match(/locale=([^&amp;]*)/);
+  return match ? match[1] : null;
+}
+
+async function sendVerificationRequest(params) {
+  const { identifier, url: rawUrl, provider } = params;
+
+  const url = new URL(rawUrl);
+  const { host, searchParams } = url;
+  const transport = createTransport(provider.server);
+
+  const locale = extractLocaleFromQueryString(searchParams.get("callbackUrl"));
+  const data = i18n(url)[locale];
+  const title = data.title;
+
+  const result = await transport.sendMail({
+    to: identifier,
+    from: provider.from,
+    subject: title,
+    text: text({ url, host, title }),
+    html: html(data.mainContent, title, data.footerContent, locale),
+  });
+
+  const failed = result.rejected.concat(result.pending).filter(Boolean);
+
+  if (failed.length) {
+    throw new Error(`Email(s) (${failed.join(", ")}) could not be sent`);
+  }
+}
+
+/** Email Text body (fallback for email clients that don't render HTML, e.g. feature phones) */
+function text({ url, host, title }) {
+  return `${title}: ${host}\n${url}\n\n`;
+}
+
+export const authOptions = {
+  secret: process.env.AUTH_SECRET,
+  adapter: MongoDBAdapter(clientPromise),
+  providers: [
+    EmailProvider({
+      server: {
+        host: process.env.EMAIL_SERVER_HOST,
+        port: process.env.EMAIL_SERVER_PORT,
+        auth: {
+          user: process.env.EMAIL_SERVER_USER,
+          pass: process.env.EMAIL_SERVER_PASSWORD,
+        },
+      },
+      from: process.env.EMAIL_FROM,
+      sendVerificationRequest,
+    }),
+    // TODO: Create OAuth account linkage workflow
+    // https://stackoverflow.com/questions/71643948/nextauth-oauthaccountnotlinked-imported-data-from-another-website-autolink
+    // FacebookProvider({
+    //   clientId: process.env.AUTH_FACEBOOK_ID,
+    //   clientSecret: process.env.AUTH_FACEBOOK_SECRET,
+    // }),
+    GoogleProvider({
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+    }),
+  ],
+  pages: {
+    signIn: "/auth/signin",
+    // signOut: '/auth/signout',
+    error: "/auth/error", // Error code passed in query string as ?error=
+    verifyRequest: "/auth/verify-request", // (used for check email message)
+    // newUser: '/auth/new-user' // New users will be directed here on first sign in (leave the property out if not of interest)
+  },
+};
+
+// For more information on each option (and a full list of options) go to
+// https://next-auth.js.org/configuration/options
+export default withTracing(NextAuth(authOptions));
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#post">post</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 02 2023 21:37:55 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
