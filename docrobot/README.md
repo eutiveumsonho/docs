@@ -9,5 +9,13 @@
 ### Running locally
 
 ```bash
-cargo run
+cargo run 
+```
+
+### Building for production
+
+> This is a work in progress
+
+```bash
+cargo build --release
 ```
