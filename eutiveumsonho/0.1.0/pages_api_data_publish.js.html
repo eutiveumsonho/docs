@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: lib/auth.js</title>
+    <title>JSDoc: Source: pages/api/data/publish.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: lib/auth.js</h1>
+    <h1 class="page-title">Source: pages/api/data/publish.js</h1>
 
     
 
@@ -26,90 +26,72 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import { unstable_getServerSession } from "next-auth";
-import { authOptions } from "../pages/api/auth/[...nextauth]";
-import { getInboxCount, getUserByEmail } from "../lib/db/reads";
-import { updateUser } from "../lib/db/writes";
+            <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
+
+import { getServerSession } from "../../../lib/auth";
+import { updateDreamVisibility } from "../../../lib/db/writes";
+import {
+  BAD_REQUEST,
+  METHOD_NOT_ALLOWED,
+  SERVER_ERROR,
+  FORBIDDEN,
+} from "../../../lib/errors";
 
 /**
- * Must be used on every authenticated page
- *
- * @example
- * export default function Page(props) {
- *   const { serverSession } = props;
- *
- *   if (serverSession?.user) {
- *     return &lt;Authenticated serverSession={serverSession} />;
- *   }
- *
- *   return &lt;NotAuthenticated/>;
- * }
- *
- * export async function getServerSideProps(context) {
- *    return getAuthProps(context);
- * }
+ * This endpoint is responsible for enabling users to control the visibility of their dreams.
+ * To publish a dream means to make it visible to other users, either publicly visible,
+ * or anonymously visible. Users can also hide dreams from other users ('private' is the defaut
+ * visbility mode).
  */
-export async function getAuthProps(context) {
-  // See https://github.com/nextauthjs/next-auth/pull/4116
-  // and https://github.com/nextauthjs/next-auth/pull/4116/files#diff-4bf6ba46d8704808e8fb66e2c10fc4baf950c7e3b4f9b60dab652b1eb8e54149
-  const session = await unstable_getServerSession(
-    context.req,
-    context.res,
-    authOptions
-  );
+function publishHandler(req, res) {
+  switch (req.method) {
+    case "PATCH":
+      return patch(req, res);
+    default:
+      res.setHeader("Allow", ["PATCH"]);
+      res.status(405).end(METHOD_NOT_ALLOWED);
+      return res;
+  }
+}
+
+async function patch(req, res) {
+  const session = await getServerSession(req, res);
 
   if (!session) {
-    return {
-      props: { serverSession: null },
-    };
+    res.status(403).end(FORBIDDEN);
+    return res;
   }
 
-  const inboxCount = await getInboxCount(session.user.email);
-
-  if (!session.user?.name || !session.user?.image) {
-    const userData = await getUserByEmail(session.user.email);
-
-    let remainingUserData = {};
-
-    if (!userData?.name) {
-      remainingUserData = {
-        name: "",
-      };
-    }
-
-    if (!userData?.image) {
-      remainingUserData = {
-        ...remainingUserData,
-        image: `https://avatars.dicebear.com/v2/jdenticon/${session.user.email}.svg`,
-      };
-    }
-
-    await updateUser(userData._id, remainingUserData);
-
-    return {
-      props: {
-        serverSession: {
-          ...session,
-          user: {
-            ...session.user,
-            ...remainingUserData,
-          },
-          inboxCount,
-        },
-      },
-    };
+  if (!req.body?.dreamId || !req.body?.visibility) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
   }
 
-  return {
-    props: {
-      serverSession: { ...session, inboxCount },
-    },
-  };
+  try {
+    await updateDreamVisibility(
+      req.body.dreamId,
+      req.body.visibility,
+      session.user.email
+    );
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).end();
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data/publish",
+      method: "patch",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
 }
 
-export async function getServerSession(req, res) {
-  return await unstable_getServerSession(req, res, authOptions);
-}
+export default publishHandler;
 </code></pre>
         </article>
     </section>

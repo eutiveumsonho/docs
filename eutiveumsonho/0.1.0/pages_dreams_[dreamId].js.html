@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: lib/auth.js</title>
+    <title>JSDoc: Source: pages/dreams/[dreamId].js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: lib/auth.js</h1>
+    <h1 class="page-title">Source: pages/dreams/[dreamId].js</h1>
 
     
 
@@ -26,89 +26,134 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import { unstable_getServerSession } from "next-auth";
-import { authOptions } from "../pages/api/auth/[...nextauth]";
-import { getInboxCount, getUserByEmail } from "../lib/db/reads";
-import { updateUser } from "../lib/db/writes";
+            <pre class="prettyprint source linenums"><code>import Head from "next/head";
+import Dream from "../../containers/dream";
+import { getAuthProps } from "../../lib/auth";
+import { truncate } from "../../lib/strings";
+import {
+  getDreamById,
+  getUserByEmail,
+  getUserById,
+  getComments,
+} from "../../lib/db/reads";
+import { getUserAgentProps } from "../../lib/user-agent";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
 
 /**
- * Must be used on every authenticated page
+ * Dream page. This page shows a user's dream.
  *
- * @example
- * export default function Page(props) {
- *   const { serverSession } = props;
- *
- *   if (serverSession?.user) {
- *     return &lt;Authenticated serverSession={serverSession} />;
- *   }
- *
- *   return &lt;NotAuthenticated/>;
- * }
- *
- * export async function getServerSideProps(context) {
- *    return getAuthProps(context);
- * }
+ * @param {{ data, comments, serverSession }} props - The props this component gets from getServerSideProps
  */
-export async function getAuthProps(context) {
-  // See https://github.com/nextauthjs/next-auth/pull/4116
-  // and https://github.com/nextauthjs/next-auth/pull/4116/files#diff-4bf6ba46d8704808e8fb66e2c10fc4baf950c7e3b4f9b60dab652b1eb8e54149
-  const session = await unstable_getServerSession(
-    context.req,
-    context.res,
-    authOptions
+export default function DreamPage(props) {
+  const { data: rawData, comments: rawComments, ...authProps } = props;
+
+  const data = JSON.parse(rawData);
+  const comments = JSON.parse(rawComments);
+
+  return (
+    &lt;>
+      &lt;Head>
+        &lt;title>{truncate(data.dream.text, 50, true)}&lt;/title>
+      &lt;/Head>
+      &lt;Dream data={data} comments={comments} {...authProps} />
+    &lt;/>
   );
+}
 
-  if (!session) {
-    return {
-      props: { serverSession: null },
-    };
-  }
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
+  const { res } = context;
 
-  const inboxCount = await getInboxCount(session.user.email);
+  try {
+    const { dreamId } = context.params;
 
-  if (!session.user?.name || !session.user?.image) {
-    const userData = await getUserByEmail(session.user.email);
+    if (!authProps.props.serverSession) {
+      const data = await getDreamById(dreamId);
 
-    let remainingUserData = {};
+      if (data.visibility === "private") {
+        res.setHeader("location", `/${context.locale}`);
+        res.statusCode = 302;
+        res.end();
 
-    if (!userData?.name) {
-      remainingUserData = {
-        name: "",
+        return { props: {} };
+      }
+
+      const user = await getUserById(data.userId);
+      data.user = user;
+
+      const comments = await getComments(dreamId);
+
+      return {
+        props: {
+          ...authProps.props,
+          data: JSON.stringify(data),
+          comments: JSON.stringify(comments),
+          ...getUserAgentProps(context),
+          ...(await serverSideTranslations(context.locale, [
+            "layout",
+            "footer",
+            "common",
+          ])),
+        },
       };
     }
 
-    if (!userData?.image) {
-      remainingUserData = {
-        ...remainingUserData,
-        image: `https://avatars.dicebear.com/v2/jdenticon/${session.user.email}.svg`,
+    let [data, user] = await Promise.all([
+      getDreamById(dreamId),
+      getUserByEmail(authProps.props.serverSession.user.email),
+    ]);
+
+    const isDreamOwner = user._id.toString() === data.userId.toString();
+
+    if (data.visibility === "private" &amp;&amp; !isDreamOwner) {
+      res.setHeader("location", `/${context.locale}/dreams`);
+      res.statusCode = 302;
+      res.end();
+
+      return {
+        props: {
+          ...getUserAgentProps(context),
+          ...(await serverSideTranslations(context.locale, [
+            "dashboard",
+            "common",
+          ])),
+        },
       };
     }
 
-    await updateUser(userData._id, remainingUserData);
+    if (data.visibility === "anonymous") {
+      delete data.userId;
+    } else {
+      if (isDreamOwner) {
+        data.user = user;
+      } else {
+        const user = await getUserById(data.userId);
+        data.user = user;
+      }
+    }
+
+    const comments = await getComments(dreamId);
 
     return {
       props: {
-        serverSession: {
-          ...session,
-          user: {
-            ...session.user,
-            ...remainingUserData,
-          },
-          inboxCount,
-        },
+        ...authProps.props,
+        data: JSON.stringify(data),
+        comments: JSON.stringify(comments),
+        ...getUserAgentProps(context),
+        ...(await serverSideTranslations(context.locale, [
+          "dashboard",
+          "common",
+        ])),
       },
     };
+  } catch (error) {
+    console.error({
+      error,
+      service: "web",
+      pathname: "/sonhos/[dreamId]",
+      component: "DreamPage",
+    });
   }
-
-  return {
-    props: {
-      serverSession: { ...session, inboxCount },
-    },
-  };
-}
-
-export async function getServerSession(req, res) {
-  return await unstable_getServerSession(req, res, authOptions);
 }
 </code></pre>
         </article>

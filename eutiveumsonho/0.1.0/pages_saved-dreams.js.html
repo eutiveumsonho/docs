@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: lib/auth.js</title>
+    <title>JSDoc: Source: pages/saved-dreams.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: lib/auth.js</h1>
+    <h1 class="page-title">Source: pages/saved-dreams.js</h1>
 
     
 
@@ -26,89 +26,95 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import { unstable_getServerSession } from "next-auth";
-import { authOptions } from "../pages/api/auth/[...nextauth]";
-import { getInboxCount, getUserByEmail } from "../lib/db/reads";
-import { updateUser } from "../lib/db/writes";
+            <pre class="prettyprint source linenums"><code>import { getAuthProps } from "../lib/auth";
+import Head from "next/head";
+import SavedDreams from "../containers/saved-dreams";
+import { getStarredDreams, getUserById } from "../lib/db/reads";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+import { useTranslation } from "react-i18next";
+import { useRouter } from "next/router";
 
 /**
- * Must be used on every authenticated page
+ * Saved dreams page. This page shows the user's saved dreams.
+ * The user can manage their saved dreams on this page.
  *
- * @example
- * export default function Page(props) {
- *   const { serverSession } = props;
- *
- *   if (serverSession?.user) {
- *     return &lt;Authenticated serverSession={serverSession} />;
- *   }
- *
- *   return &lt;NotAuthenticated/>;
- * }
- *
- * export async function getServerSideProps(context) {
- *    return getAuthProps(context);
- * }
+ * @param {{ serverSession, data }} props - The props this component gets from getServerSideProps
  */
-export async function getAuthProps(context) {
-  // See https://github.com/nextauthjs/next-auth/pull/4116
-  // and https://github.com/nextauthjs/next-auth/pull/4116/files#diff-4bf6ba46d8704808e8fb66e2c10fc4baf950c7e3b4f9b60dab652b1eb8e54149
-  const session = await unstable_getServerSession(
-    context.req,
-    context.res,
-    authOptions
-  );
+export default function Saved(props) {
+  const { serverSession: rawServerSession, data: rawData } = props;
 
-  if (!session) {
-    return {
-      props: { serverSession: null },
-    };
+  const serverSession = JSON.parse(rawServerSession);
+  const data = JSON.parse(rawData);
+  const { t } = useTranslation("dashboard");
+  const { locale } = useRouter();
+
+  return (
+    &lt;>
+      &lt;Head>
+        &lt;title>{t("saved-dreams")}&lt;/title>
+      &lt;/Head>
+      &lt;SavedDreams
+        serverSession={serverSession}
+        data={data}
+        title={t("saved-dreams")}
+        page="saved-dreams"
+        empty={{
+          label: t("discover-dreams"),
+          actionRoute: `/${locale}/dreams`,
+          description: t("no-saved"),
+        }}
+      />
+    &lt;/>
+  );
+}
+
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
+
+  if (!authProps.props.serverSession) {
+    const { res, locale } = context;
+    res.setHeader("location", `/${locale}/auth/signin`);
+    res.statusCode = 302;
+    res.end();
   }
 
-  const inboxCount = await getInboxCount(session.user.email);
+  try {
+    const data = await getStarredDreams(
+      authProps.props.serverSession.user.email
+    );
 
-  if (!session.user?.name || !session.user?.image) {
-    const userData = await getUserByEmail(session.user.email);
+    const dreams = [];
 
-    let remainingUserData = {};
+    for (let dream of data) {
+      if (dream.visibility === "anonymous") {
+        delete dream.userId;
+        dreams.push(dream);
+        continue;
+      }
 
-    if (!userData?.name) {
-      remainingUserData = {
-        name: "",
-      };
+      const user = await getUserById(dream.userId);
+      dream.user = user;
+      dreams.push(dream);
     }
-
-    if (!userData?.image) {
-      remainingUserData = {
-        ...remainingUserData,
-        image: `https://avatars.dicebear.com/v2/jdenticon/${session.user.email}.svg`,
-      };
-    }
-
-    await updateUser(userData._id, remainingUserData);
 
     return {
       props: {
-        serverSession: {
-          ...session,
-          user: {
-            ...session.user,
-            ...remainingUserData,
-          },
-          inboxCount,
-        },
+        serverSession: JSON.stringify(authProps.props.serverSession),
+        data: JSON.stringify(dreams),
+        ...(await serverSideTranslations(context.locale, [
+          "dashboard",
+          "common",
+        ])),
       },
     };
+  } catch (error) {
+    console.error({
+      error,
+      service: "web",
+      pathname: "/saved-dreams",
+      component: "SavedDreams",
+    });
   }
-
-  return {
-    props: {
-      serverSession: { ...session, inboxCount },
-    },
-  };
-}
-
-export async function getServerSession(req, res) {
-  return await unstable_getServerSession(req, res, authOptions);
 }
 </code></pre>
         </article>

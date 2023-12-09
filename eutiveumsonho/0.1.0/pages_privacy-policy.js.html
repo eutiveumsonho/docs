@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/privacy-policy.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/privacy-policy.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { PageContent } from "grommet";
+import Head from "next/head";
+import Layout from "../components/layout";
+import { getAuthProps } from "../lib/auth";
+import { getUserAgentProps } from "../lib/user-agent";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+import { useTranslation } from "next-i18next";
+import { useRouter } from "next/router";
+
+/**
+ * This component represents the page for the privacy policy.
+ * On this page, users can read the privacy policy rendered from iubenda.
+ *
+ * @param {{ serversSession, deviceType }} props - The props this component gets from getServerSideProps
+ */
+export default function PrivacyPolicy(props) {
+  const { serverSession: rawServerSession, deviceType } = props;
+  const { t } = useTranslation("footer");
+  const { locale } = useRouter();
+
+  const serverSession = JSON.parse(rawServerSession);
+
+  const privacyPolicies = {
+    en: '&lt;a href="https://www.iubenda.com/privacy-policy/70195735" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iubenda-noiframe iub-body-embed" title="Privacy Policy">Privacy Policy&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+    pt: '&lt;a href="https://www.iubenda.com/privacy-policy/26392272" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iub-no-markup iubenda-noiframe iub-body-embed" title="Política de Privacidade">Política de Privacidade&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+    undefined:
+      '&lt;a href="https://www.iubenda.com/privacy-policy/26392272" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iub-no-markup iubenda-noiframe iub-body-embed" title="Política de Privacidade">Política de Privacidade&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+    es: '&lt;a href="https://www.iubenda.com/privacy-policy/63047876" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iubenda-noiframe iub-body-embed" title="Política de Privacidad">Política de Privacidad&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+  };
+
+  return (
+    &lt;Layout serverSession={serverSession} deviceType={deviceType}>
+      &lt;Head>
+        &lt;title>{t("privacy")}&lt;/title>
+        &lt;meta name="description" content={t("privacy")} />
+        &lt;link rel="icon" href="/favicon.ico" />
+      &lt;/Head>
+      &lt;PageContent
+        justify="center"
+        align="center"
+        flex
+        style={{
+          minHeight: "100vh",
+        }}
+      >
+        &lt;div
+          dangerouslySetInnerHTML={{
+            __html: privacyPolicies[locale]
+              ? privacyPolicies[locale]
+              : privacyPolicies["en"],
+          }}
+        />
+      &lt;/PageContent>
+    &lt;/Layout>
+  );
+}
+
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
+
+  if (authProps.props.serverSession) {
+    return {
+      props: {
+        ...getUserAgentProps(context),
+        ...(await serverSideTranslations(context.locale, [
+          "footer",
+          "layout",
+          "common",
+        ])),
+      },
+    };
+  }
+
+  return {
+    props: {
+      serverSession: JSON.stringify(authProps.props.serverSession),
+      ...getUserAgentProps(context),
+      ...(await serverSideTranslations(context.locale, [
+        "footer",
+        "layout",
+        "common",
+      ])),
+    },
+  };
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#accountHandler">accountHandler</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#aiCommentsHandler">aiCommentsHandler</a></li><li><a href="global.html#commentsHandler">commentsHandler</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#dataHandler">dataHandler</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#inboxHandler">inboxHandler</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#post">post</a></li><li><a href="global.html#publishHandler">publishHandler</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#starsHandler">starsHandler</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 14:07:01 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

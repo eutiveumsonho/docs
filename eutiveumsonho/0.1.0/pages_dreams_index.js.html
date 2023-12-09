@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: lib/auth.js</title>
+    <title>JSDoc: Source: pages/dreams/index.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: lib/auth.js</h1>
+    <h1 class="page-title">Source: pages/dreams/index.js</h1>
 
     
 
@@ -26,89 +26,103 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import { unstable_getServerSession } from "next-auth";
-import { authOptions } from "../pages/api/auth/[...nextauth]";
-import { getInboxCount, getUserByEmail } from "../lib/db/reads";
-import { updateUser } from "../lib/db/writes";
+            <pre class="prettyprint source linenums"><code>import { getAuthProps } from "../../lib/auth";
+import {
+  getLatestPublicDreams,
+  getStarsByUserEmail,
+  getUserById,
+} from "../../lib/db/reads";
+import PublicDreams from "../../containers/public-dreams";
+import Head from "next/head";
+import { getUserAgentProps } from "../../lib/user-agent";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+import { useTranslation } from "next-i18next";
 
 /**
- * Must be used on every authenticated page
+ * The home page for logged in users. This page shows a feed with the latest public dreams.
  *
- * @example
- * export default function Page(props) {
- *   const { serverSession } = props;
- *
- *   if (serverSession?.user) {
- *     return &lt;Authenticated serverSession={serverSession} />;
- *   }
- *
- *   return &lt;NotAuthenticated/>;
- * }
- *
- * export async function getServerSideProps(context) {
- *    return getAuthProps(context);
- * }
+ * @param {{ serverSession, data, stars, deviceType }} props - The props this component gets from getServerSideProps
  */
-export async function getAuthProps(context) {
-  // See https://github.com/nextauthjs/next-auth/pull/4116
-  // and https://github.com/nextauthjs/next-auth/pull/4116/files#diff-4bf6ba46d8704808e8fb66e2c10fc4baf950c7e3b4f9b60dab652b1eb8e54149
-  const session = await unstable_getServerSession(
-    context.req,
-    context.res,
-    authOptions
-  );
+export default function FindOut(props) {
+  const {
+    serverSession: rawServerSession,
+    data: rawData,
+    stars: rawStars,
+    deviceType,
+  } = props;
 
-  if (!session) {
-    return {
-      props: { serverSession: null },
-    };
+  const serverSession = JSON.parse(rawServerSession);
+  const { t } = useTranslation("dashboard");
+
+  const data = JSON.parse(rawData);
+  const stars = JSON.parse(rawStars);
+
+  return (
+    &lt;>
+      &lt;Head>
+        &lt;title>{t("discover")}&lt;/title>
+      &lt;/Head>
+      &lt;PublicDreams
+        serverSession={serverSession}
+        data={data}
+        stars={stars}
+        title={t("recent-dreams")}
+        deviceType={deviceType}
+      />
+    &lt;/>
+  );
+}
+
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
+
+  if (!authProps.props.serverSession) {
+    const { res } = context;
+    res.setHeader("location", `/${context.locale}/auth/signin`);
+    res.statusCode = 302;
+    res.end();
   }
 
-  const inboxCount = await getInboxCount(session.user.email);
+  try {
+    const data = await getLatestPublicDreams();
+    const stars = await getStarsByUserEmail(
+      authProps.props.serverSession.user.email
+    );
 
-  if (!session.user?.name || !session.user?.image) {
-    const userData = await getUserByEmail(session.user.email);
+    const dreams = [];
 
-    let remainingUserData = {};
+    for (let dream of data) {
+      if (dream.visibility === "anonymous") {
+        delete dream.userId;
+        dreams.push(dream);
+        continue;
+      }
 
-    if (!userData?.name) {
-      remainingUserData = {
-        name: "",
-      };
+      const user = await getUserById(dream.userId);
+      dream.user = user;
+      dreams.push(dream);
     }
-
-    if (!userData?.image) {
-      remainingUserData = {
-        ...remainingUserData,
-        image: `https://avatars.dicebear.com/v2/jdenticon/${session.user.email}.svg`,
-      };
-    }
-
-    await updateUser(userData._id, remainingUserData);
 
     return {
       props: {
-        serverSession: {
-          ...session,
-          user: {
-            ...session.user,
-            ...remainingUserData,
-          },
-          inboxCount,
-        },
+        serverSession: JSON.stringify(authProps.props.serverSession),
+        data: JSON.stringify(dreams),
+        stars: JSON.stringify(stars),
+        ...getUserAgentProps(context),
+        ...(await serverSideTranslations(context.locale, [
+          "dashboard",
+          "common",
+        ])),
       },
     };
+  } catch (error) {
+    console.error({
+      error,
+      service: "web",
+      pathname: "/dreams",
+      component: "FindOut",
+    });
   }
-
-  return {
-    props: {
-      serverSession: { ...session, inboxCount },
-    },
-  };
-}
-
-export async function getServerSession(req, res) {
-  return await unstable_getServerSession(req, res, authOptions);
 }
 </code></pre>
         </article>
