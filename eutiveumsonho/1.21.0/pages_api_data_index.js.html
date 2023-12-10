@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/api/data/inbox.js</title>
+    <title>JSDoc: Source: pages/api/data/index.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/api/data/inbox.js</h1>
+    <h1 class="page-title">Source: pages/api/data/index.js</h1>
 
     
 
@@ -29,12 +29,8 @@
             <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 
 import { getServerSession } from "../../../lib/auth";
-import {
-  deleteAllInboxMessages,
-  deleteSomeInboxMessages,
-  markAllInboxMessagesAsRead,
-  markSomeInboxMessagesAsRead,
-} from "../../../lib/db/writes";
+import { getUserById, searchDreams } from "../../../lib/db/reads";
+import { createDream, deleteDream, updateDream } from "../../../lib/db/writes";
 import {
   BAD_REQUEST,
   METHOD_NOT_ALLOWED,
@@ -43,26 +39,27 @@ import {
 } from "../../../lib/errors";
 
 /**
- * This is the API route for managing inbox messages.
- * It supports PATCH and DELETE, allowing users to mark messages as read and
- * delete them.
+ * This is the main API route for getting, creating, updating, and deleting dreams.
+ * It supports GET, POST, PATCH, and DELETE, allowing users to search for dreams,
+ * create new dreams, update existing dreams, and delete dreams.
  */
-function inboxHandler(req, res) {
+function dataHandler(req, res) {
   switch (req.method) {
+    case "POST":
+      return post(req, res);
     case "PATCH":
       return patch(req, res);
     case "DELETE":
       return del(req, res);
+    case "GET":
+      return get(req, res);
     default:
-      res.setHeader("Allow", ["PATCH", "DELETE"]);
+      res.setHeader("Allow", ["GET", "POST", "PATCH", "DELETE"]);
       res.status(405).end(METHOD_NOT_ALLOWED);
       return res;
   }
 }
 
-/**
- * @private
- */
 async function patch(req, res) {
   const session = await getServerSession(req, res);
 
@@ -71,32 +68,27 @@ async function patch(req, res) {
     return res;
   }
 
-  if (!req.body?.inboxIds) {
+  if (
+    !req.body?.dreamData?.dream?.text ||
+    !req.body?.dreamData?.dream?.html ||
+    !req.body?.dreamId
+  ) {
     res.status(400).end(BAD_REQUEST);
     return res;
   }
 
   try {
-    if (req.body?.all) {
-      await markAllInboxMessagesAsRead(session.user.email);
-
-      res.setHeader("Content-Type", "application/json");
-      res.status(201).send({});
-
-      return res;
-    }
-
-    await markSomeInboxMessagesAsRead(req.body.inboxIds);
+    await updateDream(req.body.dreamId, req.body.dreamData, session.user.email);
 
     res.setHeader("Content-Type", "application/json");
-    res.status(201).send({});
+    res.status(200).end();
 
     return res;
   } catch (error) {
     console.error({
       error,
       service: "api",
-      pathname: "/api/data/inbox",
+      pathname: "/api/data",
       method: "patch",
     });
     res.status(500).end(SERVER_ERROR);
@@ -106,8 +98,46 @@ async function patch(req, res) {
 }
 
 /**
- * @private
+ * This is called when a dream is saved
+ * for the very first time.
  */
+async function post(req, res) {
+  const session = await getServerSession(req, res);
+
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
+  }
+
+  if (!req.body?.dream?.text || !req.body?.dream?.html) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  const data = { dream: req.body, session };
+
+  try {
+    const result = await createDream(data);
+
+    const objectId = result.insertedId.toString();
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send({ objectId });
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data",
+      method: "post",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
+}
+
 async function del(req, res) {
   const session = await getServerSession(req, res);
 
@@ -116,32 +146,23 @@ async function del(req, res) {
     return res;
   }
 
-  if (!req.body?.inboxIds) {
+  if (!req.body?.dreamId) {
     res.status(400).end(BAD_REQUEST);
     return res;
   }
 
   try {
-    if (req.body?.all) {
-      await deleteAllInboxMessages(session.user.email);
-
-      res.setHeader("Content-Type", "application/json");
-      res.status(201).send({});
-
-      return res;
-    }
-
-    await deleteSomeInboxMessages(req.body.inboxIds);
+    const result = await deleteDream(req.body.dreamId);
 
     res.setHeader("Content-Type", "application/json");
-    res.status(201).send({});
+    res.status(200).send(result);
 
     return res;
   } catch (error) {
     console.error({
       error,
       service: "api",
-      pathname: "/api/data/inbox",
+      pathname: "/api/data",
       method: "delete",
     });
     res.status(500).end(SERVER_ERROR);
@@ -150,7 +171,54 @@ async function del(req, res) {
   }
 }
 
-export default inboxHandler;
+async function get(req, res) {
+  const session = await getServerSession(req, res);
+
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
+  }
+
+  if (!req.query?.query) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  try {
+    const result = await searchDreams(req.query.query);
+
+    const dreams = [];
+
+    for (let dream of result) {
+      if (dream.visibility === "anonymous") {
+        delete dream.userId;
+        dreams.push(dream);
+        continue;
+      }
+
+      const user = await getUserById(dream.userId);
+      dream.user = user;
+      dreams.push(dream);
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send(dreams);
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data",
+      method: "get",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
+}
+
+export default dataHandler;
 </code></pre>
         </article>
     </section>
@@ -167,7 +235,7 @@ export default inboxHandler;
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 23:06:11 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 18:41:42 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>

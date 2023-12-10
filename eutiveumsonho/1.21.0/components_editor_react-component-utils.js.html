@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/api/data/stars.js</title>
+    <title>JSDoc: Source: components/editor/react-component-utils.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/api/data/stars.js</h1>
+    <h1 class="page-title">Source: components/editor/react-component-utils.js</h1>
 
     
 
@@ -26,120 +26,106 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-
-import { getServerSession } from "../../../lib/auth";
-import { starDream, unstarDream } from "../../../lib/db/writes";
-import {
-  BAD_REQUEST,
-  METHOD_NOT_ALLOWED,
-  SERVER_ERROR,
-  FORBIDDEN,
-} from "../../../lib/errors";
+            <pre class="prettyprint source linenums"><code>import {
+  capitalize,
+  getShortcutSymbols,
+  includes,
+  isArray,
+  isEqual,
+  isFunction,
+  isString,
+} from "@remirror/core";
 
 /**
- * This endpoint is used to star and unstar dreams.
- * To star a dream means to save it to a user's list of starred/saved dreams.
- * This endpoint only supports POST and DELETE.
+ * Get the value from the option passed into the command.
  */
-function starsHandler(req, res) {
-  switch (req.method) {
-    case "POST":
-      return post(req, res);
-    case "DELETE":
-      return del(req, res);
-    default:
-      res.setHeader("Allow", ["POST", "DELETE"]);
-      res.status(405).end(METHOD_NOT_ALLOWED);
-      return res;
-  }
+
+export function getCommandOptionValue(value, commandProps) {
+  return isFunction(value) ? value(commandProps) : value;
 }
 
 /**
- * @private
+ * Checks whether the first element in an array is a string and assumes the
+ * whole array is a string array.
  */
-async function post(req, res) {
-  const session = await getServerSession(req, res);
-
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (!req.body.dreamId) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  const data = {
-    dreamId: req.body.dreamId,
-    session,
-  };
-
-  try {
-    const result = await starDream(data);
-
-    const objectId = result.insertedId.toString();
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(201).send({ objectId });
-
-    return res;
-  } catch (error) {
-    console.error({
-      error,
-      service: "api",
-      pathname: "/api/data/stars",
-      method: "post",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
-  }
+function isStringArray(array) {
+  return isString(array[0]);
 }
+/**
+ * Get the string value from the available UI Shortcut.
+ */
+
+export function getUiShortcutString(uiShortcut, attrs) {
+  if (isString(uiShortcut)) {
+    return uiShortcut;
+  }
+
+  if (!isArray(uiShortcut)) {
+    return uiShortcut.shortcut;
+  }
+
+  if (isStringArray(uiShortcut)) {
+    return uiShortcut[0] ?? "";
+  }
+
+  return (
+    (
+      uiShortcut.find((shortcut) => isEqual(shortcut.attrs, attrs)) ??
+      uiShortcut[0]
+    )?.shortcut ?? ""
+  );
+}
+
+const CASINGS = {
+  title: (value) => capitalize(value),
+  upper: (value) => value.toLocaleUpperCase(),
+  lower: (value) => value.toLocaleLowerCase(),
+};
 
 /**
- * @private
+ * Get a normalized shortcut as a string.
  */
-async function del(req, res) {
-  const session = await getServerSession(req, res);
+export function getShortcutString(shortcut, options) {
+  const {
+    casing = "title",
+    namedAsSymbol = false,
+    modifierAsSymbol = true,
+    separator = " ",
+    t,
+  } = options;
 
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
+  const symbols = getShortcutSymbols(shortcut);
+  const stringSymbols = [];
+
+  const transform = CASINGS[casing];
+
+  for (const sym of symbols) {
+    if (sym.type === "char") {
+      stringSymbols.push(transform(sym.key));
+      continue;
+    }
+
+    if (sym.type === "named") {
+      const value =
+        namedAsSymbol === true ||
+        (isArray(namedAsSymbol) &amp;&amp; includes(namedAsSymbol, sym.key))
+          ? sym.symbol ?? t(sym.i18n)
+          : t(sym.i18n);
+      stringSymbols.push(transform(value));
+
+      continue;
+    }
+
+    const value =
+      modifierAsSymbol === true ||
+      (isArray(modifierAsSymbol) &amp;&amp; includes(modifierAsSymbol, sym.key))
+        ? sym.symbol
+        : t(sym.i18n);
+    stringSymbols.push(transform(value));
   }
 
-  if (!req.body?.dreamId) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  const data = {
-    dreamId: req.body.dreamId,
-    session,
-  };
-
-  try {
-    const result = await unstarDream(data);
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(200).send(result);
-
-    return res;
-  } catch (error) {
-    console.error({
-      error,
-      service: "api",
-      pathname: "/api/data/stars",
-      method: "delete",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
-  }
+  return stringSymbols.join(separator);
 }
-
-export default starsHandler;
 </code></pre>
         </article>
     </section>
@@ -156,7 +142,7 @@ export default starsHandler;
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 23:06:11 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 18:41:42 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>

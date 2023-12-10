@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/account.js</title>
+    <title>JSDoc: Source: pages/api/data/inbox.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/account.js</h1>
+    <h1 class="page-title">Source: pages/api/data/inbox.js</h1>
 
     
 
@@ -26,73 +26,131 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import Head from "next/head";
-import MyAccountPage from "../containers/my-account";
-import { getAuthProps } from "../lib/auth";
-import { getUserByEmail } from "../lib/db/reads";
-import { getUserAgentProps } from "../lib/user-agent";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
-import { useTranslation } from "next-i18next";
+            <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
+
+import { getServerSession } from "../../../lib/auth";
+import {
+  deleteAllInboxMessages,
+  deleteSomeInboxMessages,
+  markAllInboxMessagesAsRead,
+  markSomeInboxMessagesAsRead,
+} from "../../../lib/db/writes";
+import {
+  BAD_REQUEST,
+  METHOD_NOT_ALLOWED,
+  SERVER_ERROR,
+  FORBIDDEN,
+} from "../../../lib/errors";
 
 /**
- * This component represents the page for the user's account.
- * On this page, users can manage their account settings.
- *
- * @param {{ serversSession, data }} props
- * @returns {JSX.Element}
+ * This is the API route for managing inbox messages.
+ * It supports PATCH and DELETE, allowing users to mark messages as read and
+ * delete them.
  */
-export default function MyAccount(props) {
-  const { serverSession: rawServerSession, data: rawData } = props;
-
-  const { t } = useTranslation("dashboard");
-  const serverSession = JSON.parse(rawServerSession);
-  const data = JSON.parse(rawData);
-
-  return (
-    &lt;>
-      &lt;Head>
-        &lt;title>{t("my-account")}&lt;/title>
-      &lt;/Head>
-      &lt;MyAccountPage serverSession={serverSession} data={data} />
-    &lt;/>
-  );
+function inboxHandler(req, res) {
+  switch (req.method) {
+    case "PATCH":
+      return patch(req, res);
+    case "DELETE":
+      return del(req, res);
+    default:
+      res.setHeader("Allow", ["PATCH", "DELETE"]);
+      res.status(405).end(METHOD_NOT_ALLOWED);
+      return res;
+  }
 }
 
-export async function getServerSideProps(context) {
-  const authProps = await getAuthProps(context);
+/**
+ * @private
+ */
+async function patch(req, res) {
+  const session = await getServerSession(req, res);
 
-  if (!authProps.props.serverSession) {
-    const { res } = context;
-    res.setHeader("location", `/${context.locale}/auth/signin`);
-    res.statusCode = 302;
-    res.end();
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
+  }
+
+  if (!req.body?.inboxIds) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
   }
 
   try {
-    const { email } = authProps.props.serverSession.user;
+    if (req.body?.all) {
+      await markAllInboxMessagesAsRead(session.user.email);
 
-    const data = await getUserByEmail(email);
+      res.setHeader("Content-Type", "application/json");
+      res.status(201).send({});
 
-    return {
-      props: {
-        serverSession: JSON.stringify(authProps.props.serverSession),
-        data: JSON.stringify(data),
-        ...getUserAgentProps(context),
-        ...(await serverSideTranslations(context.locale, [
-          "dashboard",
-          "common",
-        ])),
-      },
-    };
+      return res;
+    }
+
+    await markSomeInboxMessagesAsRead(req.body.inboxIds);
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send({});
+
+    return res;
   } catch (error) {
     console.error({
       error,
-      service: "web",
-      pathname: "/account",
-      component: "MyAccount",
+      service: "api",
+      pathname: "/api/data/inbox",
+      method: "patch",
     });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
   }
 }
+
+/**
+ * @private
+ */
+async function del(req, res) {
+  const session = await getServerSession(req, res);
+
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
+  }
+
+  if (!req.body?.inboxIds) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  try {
+    if (req.body?.all) {
+      await deleteAllInboxMessages(session.user.email);
+
+      res.setHeader("Content-Type", "application/json");
+      res.status(201).send({});
+
+      return res;
+    }
+
+    await deleteSomeInboxMessages(req.body.inboxIds);
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send({});
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data/inbox",
+      method: "delete",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
+}
+
+export default inboxHandler;
 </code></pre>
         </article>
     </section>
@@ -109,7 +167,7 @@ export async function getServerSideProps(context) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 23:06:11 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 18:41:42 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>

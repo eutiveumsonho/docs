@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/api/data/index.js</title>
+    <title>JSDoc: Source: pages/api/account.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/api/data/index.js</h1>
+    <h1 class="page-title">Source: pages/api/account.js</h1>
 
     
 
@@ -28,113 +28,23 @@
         <article>
             <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 
-import { getServerSession } from "../../../lib/auth";
-import { getUserById, searchDreams } from "../../../lib/db/reads";
-import { createDream, deleteDream, updateDream } from "../../../lib/db/writes";
-import {
-  BAD_REQUEST,
-  METHOD_NOT_ALLOWED,
-  SERVER_ERROR,
-  FORBIDDEN,
-} from "../../../lib/errors";
+import { getServerSession } from "../../lib/auth";
+import { METHOD_NOT_ALLOWED, SERVER_ERROR, FORBIDDEN } from "../../lib/errors";
+import { deleteAccount } from "../../lib/db/writes";
 
 /**
- * This is the main API route for getting, creating, updating, and deleting dreams.
- * It supports GET, POST, PATCH, and DELETE, allowing users to search for dreams,
- * create new dreams, update existing dreams, and delete dreams.
+ * Account related API. Currently only supports DELETE.
+ * When deleting an account, we delete all dreams, comments, and inbox messages
+ * through this endpoint.
  */
-function dataHandler(req, res) {
+function accountHandler(req, res) {
   switch (req.method) {
-    case "POST":
-      return post(req, res);
-    case "PATCH":
-      return patch(req, res);
     case "DELETE":
       return del(req, res);
-    case "GET":
-      return get(req, res);
     default:
-      res.setHeader("Allow", ["GET", "POST", "PATCH", "DELETE"]);
+      res.setHeader("Allow", ["DELETE"]);
       res.status(405).end(METHOD_NOT_ALLOWED);
       return res;
-  }
-}
-
-async function patch(req, res) {
-  const session = await getServerSession(req, res);
-
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (
-    !req.body?.dreamData?.dream?.text ||
-    !req.body?.dreamData?.dream?.html ||
-    !req.body?.dreamId
-  ) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  try {
-    await updateDream(req.body.dreamId, req.body.dreamData, session.user.email);
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(200).end();
-
-    return res;
-  } catch (error) {
-    console.error({
-      error,
-      service: "api",
-      pathname: "/api/data",
-      method: "patch",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
-  }
-}
-
-/**
- * This is called when a dream is saved
- * for the very first time.
- */
-async function post(req, res) {
-  const session = await getServerSession(req, res);
-
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (!req.body?.dream?.text || !req.body?.dream?.html) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  const data = { dream: req.body, session };
-
-  try {
-    const result = await createDream(data);
-
-    const objectId = result.insertedId.toString();
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(201).send({ objectId });
-
-    return res;
-  } catch (error) {
-    console.error({
-      error,
-      service: "api",
-      pathname: "/api/data",
-      method: "post",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
   }
 }
 
@@ -146,23 +56,18 @@ async function del(req, res) {
     return res;
   }
 
-  if (!req.body?.dreamId) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
   try {
-    const result = await deleteDream(req.body.dreamId);
+    const response = await deleteAccount(session.user.email);
 
     res.setHeader("Content-Type", "application/json");
-    res.status(200).send(result);
+    res.status(200).send(response);
 
     return res;
   } catch (error) {
     console.error({
       error,
       service: "api",
-      pathname: "/api/data",
+      pathname: "/api/account",
       method: "delete",
     });
     res.status(500).end(SERVER_ERROR);
@@ -171,54 +76,7 @@ async function del(req, res) {
   }
 }
 
-async function get(req, res) {
-  const session = await getServerSession(req, res);
-
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (!req.query?.query) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  try {
-    const result = await searchDreams(req.query.query);
-
-    const dreams = [];
-
-    for (let dream of result) {
-      if (dream.visibility === "anonymous") {
-        delete dream.userId;
-        dreams.push(dream);
-        continue;
-      }
-
-      const user = await getUserById(dream.userId);
-      dream.user = user;
-      dreams.push(dream);
-    }
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(201).send(dreams);
-
-    return res;
-  } catch (error) {
-    console.error({
-      error,
-      service: "api",
-      pathname: "/api/data",
-      method: "get",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
-  }
-}
-
-export default dataHandler;
+export default accountHandler;
 </code></pre>
         </article>
     </section>
@@ -235,7 +93,7 @@ export default dataHandler;
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 23:06:11 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 18:41:42 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>

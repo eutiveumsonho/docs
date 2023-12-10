@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: lib/auth.js</title>
+    <title>JSDoc: Source: lib/db/migrations.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: lib/auth.js</h1>
+    <h1 class="page-title">Source: lib/db/migrations.js</h1>
 
     
 
@@ -26,85 +26,110 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import { getServerSession as nextAuthGetServerSession } from "next-auth";
-import { authOptions } from "../pages/api/auth/[...nextauth]";
-import { getInboxCount, getUserByEmail } from "../lib/db/reads";
-import { updateUser } from "../lib/db/writes";
+            <pre class="prettyprint source linenums"><code>import { ObjectID } from "bson";
+import { getInsights } from "../insights";
+import { getDreamsCollection } from "../mongodb";
+import { decryptDream } from "../transformations";
+import { hasCommentedOnDream } from "./reads";
+import { generateComment } from "./writes";
 
 /**
- * Must be used on every authenticated page
- *
- * @example
- * export default function Page(props) {
- *   const { serverSession } = props;
- *
- *   if (serverSession?.user) {
- *     return &lt;Authenticated serverSession={serverSession} />;
- *   }
- *
- *   return &lt;NotAuthenticated/>;
- * }
- *
- * export async function getServerSideProps(context) {
- *    return getAuthProps(context);
- * }
+ * @dataCorrection
  */
-export async function getAuthProps(context) {
-  // See https://github.com/nextauthjs/next-auth/pull/4116
-  // and https://github.com/nextauthjs/next-auth/pull/4116/files#diff-4bf6ba46d8704808e8fb66e2c10fc4baf950c7e3b4f9b60dab652b1eb8e54149
-  const session = await getServerSession(context.req, context.res, authOptions);
+export async function addMissingWordFreqData() {
+  const collection = await getDreamsCollection();
 
-  if (!session) {
-    return {
-      props: { serverSession: null },
-    };
+  const cursor = collection.find();
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
   }
 
-  const inboxCount = await getInboxCount(session.user.email);
+  const privateDeams = result.filter((data) => data.visibility === "private");
+  const publicDreams = result.filter((data) => data.visibility !== "private");
 
-  if (!session.user?.name || !session.user?.image) {
-    const userData = await getUserByEmail(session.user.email);
+  await Promise.all([
+    ...privateDeams.map((data) => {
+      const decrypted = decryptDream(data.dream);
+      const insights = getInsights(decrypted.text);
 
-    let remainingUserData = {};
-
-    if (!userData?.name) {
-      remainingUserData = {
-        name: "",
-      };
-    }
-
-    if (!userData?.image) {
-      remainingUserData = {
-        ...remainingUserData,
-        image: `https://avatars.dicebear.com/v2/jdenticon/${session.user.email}.svg`,
-      };
-    }
-
-    await updateUser(userData._id, remainingUserData);
-
-    return {
-      props: {
-        serverSession: {
-          ...session,
-          user: {
-            ...session.user,
-            ...remainingUserData,
-          },
-          inboxCount,
+      collection.updateOne(
+        {
+          _id: ObjectID(data._id),
         },
-      },
-    };
-  }
+        {
+          $set: insights,
+        }
+      );
+    }),
+    ...publicDreams.map((data) => {
+      const insights = getInsights(data.dream.text);
+      collection.updateOne(
+        {
+          _id: ObjectID(data._id),
+        },
+        {
+          $set: insights,
+        }
+      );
+    }),
+  ]);
 
-  return {
-    props: {
-      serverSession: { ...session, inboxCount },
-    },
-  };
+  await cursor.close();
+
+  return result;
 }
 
-export async function getServerSession(req, res) {
-  return await nextAuthGetServerSession(req, res, authOptions);
+/**
+ * @dataCorrection
+ */
+export async function addMissingAICommentData() {
+  const collection = await getDreamsCollection();
+
+  const cursor = collection.find();
+
+  const result = await cursor.toArray();
+
+  if (result.lenght === 0) {
+    return null;
+  }
+
+  const privateDeams = result.filter((data) => data.visibility === "private");
+  const publicDreams = result.filter((data) => data.visibility !== "private");
+
+  await Promise.all([
+    ...privateDeams.map(async (data) => {
+      const hasCommented = await hasCommentedOnDream("Sonio", data.dream._id);
+
+      if (!hasCommented) {
+        const decrypted = decryptDream(data.dream);
+        const dreamOwner = await getUserById(data.dream.userId);
+        return generateComment(data.dream._id, decrypted, {
+          user: {
+            email: dreamOwner.email,
+          },
+        });
+      }
+    }),
+    ...publicDreams.map(async (data) => {
+      const hasCommented = await hasCommentedOnDream("Sonio", data.dream._id);
+
+      if (!hasCommented) {
+        const dreamOwner = await getUserById(data.dream.userId);
+        return generateComment(data.dream._id, decrypted, {
+          user: {
+            email: dreamOwner.email,
+          },
+        });
+      }
+    }),
+  ]);
+
+  await cursor.close();
+
+  return result;
 }
 </code></pre>
         </article>
@@ -122,7 +147,7 @@ export async function getServerSession(req, res) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 23:06:11 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 18:41:42 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>

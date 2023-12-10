@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: components/editor/react-component-utils.js</title>
+    <title>JSDoc: Source: pages/api/data/comments.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: components/editor/react-component-utils.js</h1>
+    <h1 class="page-title">Source: pages/api/data/comments.js</h1>
 
     
 
@@ -26,106 +26,117 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import {
-  capitalize,
-  getShortcutSymbols,
-  includes,
-  isArray,
-  isEqual,
-  isFunction,
-  isString,
-} from "@remirror/core";
+            <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
+
+import { getServerSession } from "../../../lib/auth";
+import { createComment, deleteComment } from "../../../lib/db/writes";
+import {
+  BAD_REQUEST,
+  METHOD_NOT_ALLOWED,
+  SERVER_ERROR,
+  FORBIDDEN,
+} from "../../../lib/errors";
 
 /**
- * Get the value from the option passed into the command.
+ * This is the API route for managing comments.
+ * It supports POST and DELETE, allowing users to create and delete their own comments.
+ * Comments cannot be edited, and dream owners cannot delete comments from others (this is likely
+ * changing in the near future).
  */
-
-export function getCommandOptionValue(value, commandProps) {
-  return isFunction(value) ? value(commandProps) : value;
+function commentsHandler(req, res) {
+  switch (req.method) {
+    case "POST":
+      return post(req, res);
+    case "DELETE":
+      return del(req, res);
+    default:
+      res.setHeader("Allow", ["POST", "DELETE"]);
+      res.status(405).end(METHOD_NOT_ALLOWED);
+      return res;
+  }
 }
 
 /**
- * Checks whether the first element in an array is a string and assumes the
- * whole array is a string array.
+ * @private
  */
-function isStringArray(array) {
-  return isString(array[0]);
+async function post(req, res) {
+  const session = await getServerSession(req, res);
+
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
+  }
+
+  if (!req.body?.comment || !req.body.dreamId) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  const data = {
+    comment: req.body.comment,
+    dreamId: req.body.dreamId,
+    session,
+  };
+
+  try {
+    const result = await createComment(data);
+
+    const objectId = result.insertedId.toString();
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send({ objectId });
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data/comments",
+      method: "post",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
 }
+
 /**
- * Get the string value from the available UI Shortcut.
+ * @private
  */
+async function del(req, res) {
+  const session = await getServerSession(req, res);
 
-export function getUiShortcutString(uiShortcut, attrs) {
-  if (isString(uiShortcut)) {
-    return uiShortcut;
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
   }
 
-  if (!isArray(uiShortcut)) {
-    return uiShortcut.shortcut;
+  if (!req.body?.commentId || !req.body?.dreamId) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
   }
 
-  if (isStringArray(uiShortcut)) {
-    return uiShortcut[0] ?? "";
-  }
+  try {
+    const result = await deleteComment(req.body.commentId, req.body.dreamId);
 
-  return (
-    (
-      uiShortcut.find((shortcut) => isEqual(shortcut.attrs, attrs)) ??
-      uiShortcut[0]
-    )?.shortcut ?? ""
-  );
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send(result);
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data/comments",
+      method: "delete",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
 }
 
-const CASINGS = {
-  title: (value) => capitalize(value),
-  upper: (value) => value.toLocaleUpperCase(),
-  lower: (value) => value.toLocaleLowerCase(),
-};
-
-/**
- * Get a normalized shortcut as a string.
- */
-export function getShortcutString(shortcut, options) {
-  const {
-    casing = "title",
-    namedAsSymbol = false,
-    modifierAsSymbol = true,
-    separator = " ",
-    t,
-  } = options;
-
-  const symbols = getShortcutSymbols(shortcut);
-  const stringSymbols = [];
-
-  const transform = CASINGS[casing];
-
-  for (const sym of symbols) {
-    if (sym.type === "char") {
-      stringSymbols.push(transform(sym.key));
-      continue;
-    }
-
-    if (sym.type === "named") {
-      const value =
-        namedAsSymbol === true ||
-        (isArray(namedAsSymbol) &amp;&amp; includes(namedAsSymbol, sym.key))
-          ? sym.symbol ?? t(sym.i18n)
-          : t(sym.i18n);
-      stringSymbols.push(transform(value));
-
-      continue;
-    }
-
-    const value =
-      modifierAsSymbol === true ||
-      (isArray(modifierAsSymbol) &amp;&amp; includes(modifierAsSymbol, sym.key))
-        ? sym.symbol
-        : t(sym.i18n);
-    stringSymbols.push(transform(value));
-  }
-
-  return stringSymbols.join(separator);
-}
+export default commentsHandler;
 </code></pre>
         </article>
     </section>
@@ -142,7 +153,7 @@ export function getShortcutString(shortcut, options) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 23:06:11 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 18:41:42 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>

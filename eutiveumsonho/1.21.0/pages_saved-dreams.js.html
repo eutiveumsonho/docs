@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/api/data/comments.js</title>
+    <title>JSDoc: Source: pages/saved-dreams.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/api/data/comments.js</h1>
+    <h1 class="page-title">Source: pages/saved-dreams.js</h1>
 
     
 
@@ -26,117 +26,96 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-
-import { getServerSession } from "../../../lib/auth";
-import { createComment, deleteComment } from "../../../lib/db/writes";
-import {
-  BAD_REQUEST,
-  METHOD_NOT_ALLOWED,
-  SERVER_ERROR,
-  FORBIDDEN,
-} from "../../../lib/errors";
+            <pre class="prettyprint source linenums"><code>import { getAuthProps } from "../lib/auth";
+import Head from "next/head";
+import SavedDreams from "../containers/saved-dreams";
+import { getStarredDreams, getUserById } from "../lib/db/reads";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+import { useTranslation } from "react-i18next";
+import { useRouter } from "next/router";
 
 /**
- * This is the API route for managing comments.
- * It supports POST and DELETE, allowing users to create and delete their own comments.
- * Comments cannot be edited, and dream owners cannot delete comments from others (this is likely
- * changing in the near future).
+ * Saved dreams page. This page shows the user's saved dreams.
+ * The user can manage their saved dreams on this page.
+ *
+ * @param {{ serverSession, data }} props - The props this component gets from getServerSideProps
  */
-function commentsHandler(req, res) {
-  switch (req.method) {
-    case "POST":
-      return post(req, res);
-    case "DELETE":
-      return del(req, res);
-    default:
-      res.setHeader("Allow", ["POST", "DELETE"]);
-      res.status(405).end(METHOD_NOT_ALLOWED);
-      return res;
-  }
+export default function Saved(props) {
+  const { serverSession: rawServerSession, data: rawData } = props;
+
+  const serverSession = JSON.parse(rawServerSession);
+  const data = JSON.parse(rawData);
+  const { t } = useTranslation("dashboard");
+  const { locale } = useRouter();
+
+  return (
+    &lt;>
+      &lt;Head>
+        &lt;title>{t("saved-dreams")}&lt;/title>
+      &lt;/Head>
+      &lt;SavedDreams
+        serverSession={serverSession}
+        data={data}
+        title={t("saved-dreams")}
+        page="saved-dreams"
+        empty={{
+          label: t("discover-dreams"),
+          actionRoute: `/${locale}/dreams`,
+          description: t("no-saved"),
+        }}
+      />
+    &lt;/>
+  );
 }
 
-/**
- * @private
- */
-async function post(req, res) {
-  const session = await getServerSession(req, res);
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
 
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (!req.body?.comment || !req.body.dreamId) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  const data = {
-    comment: req.body.comment,
-    dreamId: req.body.dreamId,
-    session,
-  };
-
-  try {
-    const result = await createComment(data);
-
-    const objectId = result.insertedId.toString();
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(201).send({ objectId });
-
-    return res;
-  } catch (error) {
-    console.error({
-      error,
-      service: "api",
-      pathname: "/api/data/comments",
-      method: "post",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
-  }
-}
-
-/**
- * @private
- */
-async function del(req, res) {
-  const session = await getServerSession(req, res);
-
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (!req.body?.commentId || !req.body?.dreamId) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
+  if (!authProps.props.serverSession) {
+    const { res, locale } = context;
+    res.setHeader("location", `/${locale}/auth/signin`);
+    res.statusCode = 302;
+    res.end();
   }
 
   try {
-    const result = await deleteComment(req.body.commentId, req.body.dreamId);
+    const data = await getStarredDreams(
+      authProps.props.serverSession.user.email
+    );
 
-    res.setHeader("Content-Type", "application/json");
-    res.status(200).send(result);
+    const dreams = [];
 
-    return res;
+    for (let dream of data) {
+      if (dream.visibility === "anonymous") {
+        delete dream.userId;
+        dreams.push(dream);
+        continue;
+      }
+
+      const user = await getUserById(dream.userId);
+      dream.user = user;
+      dreams.push(dream);
+    }
+
+    return {
+      props: {
+        serverSession: JSON.stringify(authProps.props.serverSession),
+        data: JSON.stringify(dreams),
+        ...(await serverSideTranslations(context.locale, [
+          "dashboard",
+          "common",
+        ])),
+      },
+    };
   } catch (error) {
     console.error({
       error,
-      service: "api",
-      pathname: "/api/data/comments",
-      method: "delete",
+      service: "web",
+      pathname: "/saved-dreams",
+      component: "SavedDreams",
     });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
   }
 }
-
-export default commentsHandler;
 </code></pre>
         </article>
     </section>
@@ -153,7 +132,7 @@ export default commentsHandler;
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 09 2023 23:06:11 GMT+0000 (Coordinated Universal Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 18:41:42 GMT+0000 (Coordinated Universal Time)
 </footer>
 
 <script> prettyPrint(); </script>
