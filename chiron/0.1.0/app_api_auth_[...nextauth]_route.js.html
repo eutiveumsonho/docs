@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: app/api/auth/[...nextauth]/route.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: app/api/auth/[...nextauth]/route.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import clientPromise from "@/lib/mongodb";
+import { MongoDBAdapter } from "@auth/mongodb-adapter";
+import NextAuth from "next-auth";
+import EmailProvider from "next-auth/providers/email";
+import { createTransport } from "nodemailer";
+
+async function sendVerificationRequest(params) {
+  const { identifier, url, provider, theme } = params;
+
+  const allowedEmails = process.env.ALLOWED_EMAILS?.split(",") ?? [];
+  if (!allowedEmails.includes(identifier)) {
+    throw new Error("Email could not be sent");
+  }
+
+  const { host } = new URL(url);
+  // NOTE: You are not required to use `nodemailer`, use whatever you want.
+  const transport = createTransport(provider.server);
+  const result = await transport.sendMail({
+    to: identifier,
+    from: provider.from,
+    subject: `Sign in to ${host}`,
+    text: text({ url, host }),
+    html: html({ url, host, theme }),
+  });
+  const failed = result.rejected.concat(result.pending).filter(Boolean);
+  if (failed.length) {
+    throw new Error(`Email(s) (${failed.join(", ")}) could not be sent`);
+  }
+}
+
+/**
+ * Email HTML body
+ * Insert invisible space into domains from being turned into a hyperlink by email
+ * clients like Outlook and Apple mail, as this is confusing because it seems
+ * like they are supposed to click on it to sign in.
+ *
+ * @note We don't add the email address to avoid needing to escape it, if you do, remember to sanitize it!
+ */
+function html(params) {
+  const { url, host, theme } = params;
+
+  const escapedHost = host.replace(/\./g, "&amp;#8203;.");
+
+  const brandColor = theme.brandColor || "#346df1";
+  const color = {
+    background: "#f9f9f9",
+    text: "#444",
+    mainBackground: "#fff",
+    buttonBackground: brandColor,
+    buttonBorder: brandColor,
+    buttonText: theme.buttonText || "#fff",
+  };
+
+  return `
+&lt;body style="background: ${color.background};">
+  &lt;table width="100%" border="0" cellspacing="20" cellpadding="0"
+    style="background: ${color.mainBackground}; max-width: 600px; margin: auto; border-radius: 10px;">
+    &lt;tr>
+      &lt;td align="center"
+        style="padding: 10px 0px; font-size: 22px; font-family: Helvetica, Arial, sans-serif; color: ${color.text};">
+        Sign in to &lt;strong>${escapedHost}&lt;/strong>
+      &lt;/td>
+    &lt;/tr>
+    &lt;tr>
+      &lt;td align="center" style="padding: 20px 0;">
+        &lt;table border="0" cellspacing="0" cellpadding="0">
+          &lt;tr>
+            &lt;td align="center" style="border-radius: 5px;" bgcolor="${color.buttonBackground}">&lt;a href="${url}"
+                target="_blank"
+                style="font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: ${color.buttonText}; text-decoration: none; border-radius: 5px; padding: 10px 20px; border: 1px solid ${color.buttonBorder}; display: inline-block; font-weight: bold;">Sign
+                in&lt;/a>&lt;/td>
+          &lt;/tr>
+        &lt;/table>
+      &lt;/td>
+    &lt;/tr>
+    &lt;tr>
+      &lt;td align="center"
+        style="padding: 0px 0px 10px 0px; font-size: 16px; line-height: 22px; font-family: Helvetica, Arial, sans-serif; color: ${color.text};">
+        If you did not request this email you can safely ignore it.
+      &lt;/td>
+    &lt;/tr>
+  &lt;/table>
+&lt;/body>
+`;
+}
+
+/** Email Text body (fallback for email clients that don't render HTML, e.g. feature phones) */
+function text({ url, host }) {
+  return `Sign in to ${host}\n${url}\n\n`;
+}
+
+export const authOptions = {
+  secret: process.env.AUTH_SECRET,
+  adapter: MongoDBAdapter(clientPromise),
+  providers: [
+    EmailProvider({
+      server: {
+        host: process.env.EMAIL_SERVER_HOST,
+        port: process.env.EMAIL_SERVER_PORT,
+        auth: {
+          user: process.env.EMAIL_SERVER_USER,
+          pass: process.env.EMAIL_SERVER_PASSWORD,
+        },
+      },
+      from: process.env.EMAIL_FROM,
+      sendVerificationRequest,
+    }),
+  ],
+};
+
+const handler = NextAuth(authOptions);
+
+export { handler as GET, handler as POST };
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#html">html</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#useRefreshData">useRefreshData</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 10 2023 23:02:09 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
