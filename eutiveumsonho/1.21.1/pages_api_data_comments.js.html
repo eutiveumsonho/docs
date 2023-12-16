@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/api/data/comments.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/api/data/comments.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
+
+import { getServerSession } from "../../../lib/auth";
+import { createComment, deleteComment } from "../../../lib/db/writes";
+import {
+  BAD_REQUEST,
+  METHOD_NOT_ALLOWED,
+  SERVER_ERROR,
+  FORBIDDEN,
+} from "../../../lib/errors";
+
+/**
+ * This is the API route for managing comments.
+ * It supports POST and DELETE, allowing users to create and delete their own comments.
+ * Comments cannot be edited, and dream owners cannot delete comments from others (this is likely
+ * changing in the near future).
+ */
+function commentsHandler(req, res) {
+  switch (req.method) {
+    case "POST":
+      return post(req, res);
+    case "DELETE":
+      return del(req, res);
+    default:
+      res.setHeader("Allow", ["POST", "DELETE"]);
+      res.status(405).end(METHOD_NOT_ALLOWED);
+      return res;
+  }
+}
+
+/**
+ * @private
+ */
+async function post(req, res) {
+  const session = await getServerSession(req, res);
+
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
+  }
+
+  if (!req.body?.comment || !req.body.dreamId) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  const data = {
+    comment: req.body.comment,
+    dreamId: req.body.dreamId,
+    session,
+  };
+
+  try {
+    const result = await createComment(data);
+
+    const objectId = result.insertedId.toString();
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send({ objectId });
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data/comments",
+      method: "post",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
+}
+
+/**
+ * @private
+ */
+async function del(req, res) {
+  const session = await getServerSession(req, res);
+
+  if (!session) {
+    res.status(403).end(FORBIDDEN);
+    return res;
+  }
+
+  if (!req.body?.commentId || !req.body?.dreamId) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  try {
+    const result = await deleteComment(req.body.commentId, req.body.dreamId);
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send(result);
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data/comments",
+      method: "delete",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
+}
+
+export default commentsHandler;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#accountHandler">accountHandler</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#aiCommentsHandler">aiCommentsHandler</a></li><li><a href="global.html#commentsHandler">commentsHandler</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#dataHandler">dataHandler</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#inboxHandler">inboxHandler</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#post">post</a></li><li><a href="global.html#publishHandler">publishHandler</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#starsHandler">starsHandler</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 16 2023 14:44:12 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

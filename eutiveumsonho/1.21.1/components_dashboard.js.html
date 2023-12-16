@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/dashboard.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/dashboard.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import React, { cloneElement, useContext } from "react";
+import {
+  Avatar,
+  Button,
+  Box,
+  Nav,
+  Text,
+  Sidebar as SidebarBase,
+  Header,
+  Page,
+  PageContent,
+  ResponsiveContext,
+} from "grommet";
+import {
+  Book,
+  Logout,
+  Magic,
+  Star,
+  UserSettings,
+  BarChart,
+  Inbox,
+} from "grommet-icons";
+import { BRAND_HEX } from "../lib/config";
+import { Logo } from "./logo";
+import PageActions from "./page-actions";
+import { useRouter } from "next/router";
+import { signOut } from "next-auth/react";
+import { useTranslation } from "next-i18next";
+
+const MOBILE_SIDEBAR_WIDTH = "4.5rem";
+const MOBILE_HEADER_HEIGHT = "3.95rem";
+const DESKTOP_SIDEBAR_WIDTH = "15rem";
+const DESKTOP_HEADER_HEIGHT = "4.688rem";
+
+const SidebarHeader = (props) => {
+  const { serverSession, size, deviceType } = props;
+
+  const isSmall = deviceType === "mobile" || size === "small";
+
+  return (
+    &lt;Box
+      align="center"
+      gap="small"
+      direction="row"
+      margin={{ bottom: "xxsmall" }}
+      justify="center"
+    >
+      &lt;Avatar src={serverSession.user.image} />
+      {isSmall ? null : &lt;Text>{serverSession.user.name}&lt;/Text>}
+    &lt;/Box>
+  );
+};
+
+const SidebarButton = ({ icon, label, selected, ...rest }) => (
+  &lt;Button
+    gap="medium"
+    justify="start"
+    fill
+    icon={cloneElement(icon, {
+      color: selected ? "white" : undefined,
+    })}
+    label={label}
+    plain
+    {...rest}
+    style={{
+      ...rest.style,
+      whiteSpace: "nowrap",
+      height: "3rem",
+      paddingLeft: "3rem",
+      flex: "unset",
+      background: selected ? BRAND_HEX : "transparent",
+      color: selected ? "white" : "unset",
+    }}
+  />
+);
+
+const SidebarFooter = (props) => {
+  const { size, deviceType, t } = props;
+  const { pathname: rawPathname, push, locale } = useRouter();
+
+  const account = `/${locale}/account`;
+  const callback = `/${locale}`;
+  const pathname = `/${locale}${rawPathname}`;
+
+  if (deviceType === "mobile" || size === "small") {
+    return (
+      &lt;Nav gap="small">
+        &lt;Button
+          icon={&lt;UserSettings />}
+          hoverIndicator={pathname !== account}
+          primary={pathname === account}
+          onClick={() => push(account)}
+        />
+        &lt;Button
+          icon={&lt;Logout />}
+          hoverIndicator
+          onClick={async () => {
+            const data = await signOut({
+              redirect: false,
+              callbackUrl: callback,
+            });
+
+            push(data.url);
+          }}
+        />
+      &lt;/Nav>
+    );
+  }
+
+  return (
+    &lt;Nav>
+      &lt;SidebarButton
+        icon={&lt;UserSettings />}
+        label={t("my-account")}
+        selected={pathname === account}
+        onClick={() => push(account)}
+      />
+      &lt;SidebarButton
+        icon={&lt;Logout />}
+        label={t("logout")}
+        onClick={async () => {
+          const data = await signOut({
+            redirect: false,
+            callbackUrl: callback,
+          });
+
+          push(data.url);
+        }}
+      />
+    &lt;/Nav>
+  );
+};
+
+/**
+ * Navigation items are organized by
+ * usage order (data from G.A.)
+ */
+const MainNavigation = (props) => {
+  const { size, serverSession, deviceType, t } = props;
+  const { pathname: rawPathname, push, locale } = useRouter();
+
+  const dreams = `/${locale}/dreams`;
+  const myDreams = `/${locale}/my-dreams`;
+  const insights = `/${locale}/insights`;
+  const inbox = `/${locale}/inbox`;
+  const savedDreams = `/${locale}/saved-dreams`;
+  const pathname = `/${locale}${rawPathname}`;
+
+  if (deviceType === "mobile" || size === "small") {
+    return (
+      &lt;Nav gap="small">
+        &lt;Button
+          icon={&lt;Magic />}
+          hoverIndicator={pathname !== dreams}
+          primary={pathname === dreams}
+          onClick={() => push(dreams)}
+        />
+        &lt;Button
+          icon={&lt;Book />}
+          hoverIndicator={pathname !== myDreams}
+          primary={pathname === myDreams}
+          onClick={() => push(myDreams)}
+        />
+        &lt;Button
+          icon={&lt;BarChart />}
+          hoverIndicator={pathname !== insights}
+          primary={pathname === insights}
+          onClick={() => push(insights)}
+        />
+        &lt;Button
+          icon={&lt;Inbox />}
+          hoverIndicator={pathname !== inbox}
+          primary={pathname === inbox}
+          onClick={() => push(inbox)}
+          badge={
+            serverSession?.inboxCount
+              ? {
+                  value: serverSession?.inboxCount,
+                  background: {
+                    color: pathname === inbox ? "#6FFFB0" : BRAND_HEX,
+                  },
+                }
+              : 0
+          }
+        />
+        &lt;Button
+          icon={&lt;Star />}
+          hoverIndicator={pathname !== savedDreams}
+          primary={pathname === savedDreams}
+          onClick={() => push(savedDreams)}
+        />
+      &lt;/Nav>
+    );
+  }
+
+  return (
+    &lt;Nav gap="medium" fill="vertical" responsive={false}>
+      &lt;SidebarButton
+        icon={&lt;Magic />}
+        label={t("discover")}
+        selected={pathname === dreams}
+        onClick={() => push(dreams)}
+      />
+      &lt;SidebarButton
+        icon={&lt;Book />}
+        label={t("my-dreams")}
+        selected={pathname === myDreams}
+        onClick={() => push(myDreams)}
+      />
+      &lt;SidebarButton
+        icon={&lt;BarChart />}
+        label={t("insights")}
+        selected={pathname === insights}
+        onClick={() => push(insights)}
+      />
+      &lt;SidebarButton
+        icon={
+          &lt;Button
+            as="span"
+            plain
+            icon={&lt;Inbox color={pathname === inbox ? "white" : undefined} />}
+            badge={
+              serverSession?.inboxCount
+                ? {
+                    value: serverSession?.inboxCount,
+                    background: {
+                      color: pathname === inbox ? "#6FFFB0" : BRAND_HEX,
+                    },
+                  }
+                : 0
+            }
+          />
+        }
+        label={t("inbox")}
+        selected={pathname === inbox}
+        onClick={() => push(inbox)}
+      />
+      &lt;SidebarButton
+        icon={&lt;Star />}
+        label={t("saved")}
+        selected={pathname === savedDreams}
+        onClick={() => push(savedDreams)}
+      />
+    &lt;/Nav>
+  );
+};
+
+function MobileSidebar(props) {
+  const { serverSession, size, t } = props;
+
+  return (
+    &lt;SidebarBase
+      elevation="large"
+      responsive={false}
+      background="light-1"
+      header={
+        &lt;SidebarHeader
+          serverSession={serverSession}
+          size={size}
+          deviceType={"mobile"}
+          t={t}
+        />
+      }
+      footer={&lt;SidebarFooter size={size} deviceType="mobile" t={t} />}
+      style={{
+        top: MOBILE_HEADER_HEIGHT,
+        height: `calc(100vh - ${MOBILE_HEADER_HEIGHT})`,
+        minHeight: `calc(100vh - ${MOBILE_HEADER_HEIGHT})`,
+        position: "fixed",
+        minWidth: MOBILE_SIDEBAR_WIDTH,
+        maxWidth: MOBILE_SIDEBAR_WIDTH,
+        borderRight: `1px solid ${BRAND_HEX}`,
+        // Trick to make the box-shadow from the sidebar and header look good
+        zIndex: "11",
+      }}
+    >
+      &lt;MainNavigation
+        size={size}
+        serverSession={serverSession}
+        deviceType={"mobile"}
+        t={t}
+      />
+    &lt;/SidebarBase>
+  );
+}
+
+function DesktopSidebar(props) {
+  const { serverSession, size, t } = props;
+
+  return (
+    &lt;SidebarBase
+      responsive={false}
+      elevation="large"
+      header={
+        &lt;SidebarHeader
+          serverSession={serverSession}
+          size={size}
+          deviceType={"desktop"}
+          t={t}
+        />
+      }
+      footer={&lt;SidebarFooter deviceType="desktop" t={t} />}
+      pad={{ left: "unset", right: "unset", vertical: "large" }}
+      background="light-1"
+      style={{
+        position: "fixed",
+        top: DESKTOP_HEADER_HEIGHT,
+        height: `calc(100vh - ${DESKTOP_HEADER_HEIGHT})`,
+        minHeight: `calc(100vh - ${DESKTOP_HEADER_HEIGHT})`,
+        minWidth: DESKTOP_SIDEBAR_WIDTH,
+        maxWidth: DESKTOP_SIDEBAR_WIDTH,
+        borderRight: `1px solid ${BRAND_HEX}`,
+        // Trick to make the box-shadow from the sidebar and header look good
+        zIndex: "11",
+      }}
+    >
+      &lt;MainNavigation size={size} serverSession={serverSession} t={t} />
+    &lt;/SidebarBase>
+  );
+}
+
+function Sidebar(props) {
+  const { serverSession, size, deviceType, t } = props;
+
+  if (deviceType === "mobile" || size === "small") {
+    return (
+      &lt;MobileSidebar
+        serverSession={serverSession}
+        size={size}
+        deviceType={deviceType}
+        t={t}
+      />
+    );
+  }
+
+  return (
+    &lt;DesktopSidebar
+      serverSession={serverSession}
+      size={size}
+      deviceType={deviceType}
+      t={t}
+    />
+  );
+}
+
+export default function Dashboard(props) {
+  const { serverSession, children, deviceType } = props;
+  const size = useContext(ResponsiveContext);
+  const { t } = useTranslation("dashboard");
+
+  const isSmall = deviceType === "mobile" || size === "small";
+
+  return (
+    &lt;>
+      &lt;Header
+        pad="small"
+        style={{
+          position: "fixed",
+          width: "100vw",
+          borderBottom: `1px solid ${BRAND_HEX}`,
+          zIndex: "10",
+        }}
+        background="light-1"
+        elevation="large"
+      >
+        &lt;Box
+          style={{
+            display: "flex",
+            width: "100%",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            margin: "auto",
+            maxWidth: "96rem",
+            // Trick to make the box-shadow from the sidebar and header look good
+            zIndex: "9",
+          }}
+        >
+          &lt;Logo noTitle />
+          &lt;PageActions serverSession={serverSession} />
+        &lt;/Box>
+      &lt;/Header>
+      &lt;Page background="background-front" kind="full">
+        &lt;Box direction="row" height={{ min: "100%" }}>
+          &lt;Sidebar
+            serverSession={serverSession}
+            size={size}
+            deviceType={deviceType}
+            t={t}
+          />
+          &lt;PageContent
+            style={{
+              width: isSmall
+                ? `calc(100vw - ${MOBILE_SIDEBAR_WIDTH})`
+                : `calc(100vw - ${DESKTOP_SIDEBAR_WIDTH})`,
+              minHeight: isSmall
+                ? `calc(100vh - ${MOBILE_HEADER_HEIGHT})`
+                : `calc(100vh - ${DESKTOP_HEADER_HEIGHT})`,
+              minWidth: "0px",
+              marginTop: isSmall ? MOBILE_HEADER_HEIGHT : DESKTOP_HEADER_HEIGHT,
+              marginLeft: isSmall
+                ? MOBILE_SIDEBAR_WIDTH
+                : DESKTOP_SIDEBAR_WIDTH,
+            }}
+          >
+            {children}
+          &lt;/PageContent>
+        &lt;/Box>
+      &lt;/Page>
+    &lt;/>
+  );
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#accountHandler">accountHandler</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#aiCommentsHandler">aiCommentsHandler</a></li><li><a href="global.html#commentsHandler">commentsHandler</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#dataHandler">dataHandler</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#inboxHandler">inboxHandler</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#post">post</a></li><li><a href="global.html#publishHandler">publishHandler</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#starsHandler">starsHandler</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 16 2023 14:44:12 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
