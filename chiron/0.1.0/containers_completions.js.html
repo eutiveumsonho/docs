@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: containers/completions.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: containers/completions.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module containers/completions */
+"use client";
+
+import { Box, Button, List } from "grommet";
+import { useRef, useState } from "react";
+import { Like, Dislike } from "grommet-icons";
+import ScriptEditor from "@/components/editor";
+import {
+  CHIRON_PREFIX,
+  CHIRON_FOREIGN_KEY,
+  CHIRON_VENDOR_ID,
+} from "@/lib/config";
+import { usePathname } from "next/navigation";
+import { useRefreshData } from "@/lib/hooks";
+
+const chironIdxKey = CHIRON_PREFIX + "idx";
+
+/**
+ * CompletionsContainer contains all logic for managing completions reviews
+ *
+ * @param {{ completions }} props
+ */
+export function CompletionsContainer(props) {
+  const { completions } = props;
+  const [selected, setSelected] = useState();
+  const [reviewing, setReviewing] = useState(false);
+  const monacoEditorRef = useRef(null);
+  const editorRef = useRef(null);
+  const pathname = usePathname();
+  const { refresh } = useRefreshData();
+
+  const readOnly = pathname !== "/completions/pending";
+
+  const onInitializePane = (_, __, model) => {
+    editorRef.current.focus();
+    monacoEditorRef.current.setModelMarkers(model[0], "owner", null);
+  };
+
+  const onReview = async (direction) => {
+    setReviewing(true);
+    const data = editorRef.current.getModifiedEditor().getValue();
+
+    const completionWithForeignKey = completions.find((completion) => {
+      return completion[0]._id === JSON.parse(selected.item)._id;
+    })[1];
+
+    const vendorId = completionWithForeignKey?.[CHIRON_VENDOR_ID];
+    const foreignKey = completionWithForeignKey?.[CHIRON_FOREIGN_KEY];
+
+    if (!vendorId || !foreignKey) {
+      setReviewing(false);
+      return alert("Missing data");
+    }
+
+    const res = await fetch("/api/data/completions/review", {
+      method: "POST",
+      body: JSON.stringify({
+        direction,
+        data: {
+          ...JSON.parse(data),
+          [CHIRON_VENDOR_ID]: vendorId,
+          [CHIRON_FOREIGN_KEY]: foreignKey,
+        },
+      }),
+    });
+
+    if (res.status !== 200) {
+      alert(res.statusText);
+    } else {
+      alert("Sucess");
+      refresh();
+    }
+
+    setReviewing(false);
+  };
+
+  return (
+    &lt;Box gap="medium">
+      &lt;List
+        data={completions.map((completion) => completion[0])}
+        itemProps={
+          selected?.[chironIdxKey] >= 0
+            ? { [selected?.[chironIdxKey]]: { background: "brand" } }
+            : undefined
+        }
+        onClickItem={(event) => {
+          const currentlySelected =
+            selected?.[chironIdxKey] === event.index
+              ? undefined
+              : {
+                  [chironIdxKey]: event.index,
+                  item: JSON.stringify(event.item, null, 2),
+                };
+          setSelected(currentlySelected);
+        }}
+        pad={{ left: "small", right: "none", top: "small", bottom: "small" }}
+      />
+      {selected?.item ? (
+        &lt;Box
+          height={{
+            min: "42.9rem",
+          }}
+        >
+          &lt;ScriptEditor
+            code={selected.item}
+            originalCode={selected.item}
+            onInitializePane={onInitializePane}
+            editorRef={editorRef}
+            monacoEditorRef={monacoEditorRef}
+            readOnly={readOnly}
+          />
+          {readOnly ? null : (
+            &lt;Box
+              align="center"
+              justify="center"
+              direction="row"
+              pad="large"
+              gap="medium"
+            >
+              &lt;Button
+                label="Approve"
+                icon={&lt;Like />}
+                disabled={reviewing}
+                primary
+                color="neutral-1"
+                onClick={() => onReview("pending2approve")}
+              />
+              &lt;Button
+                label="Reject"
+                icon={&lt;Dislike />}
+                disabled={reviewing}
+                primary
+                color="neutral-4"
+                onClick={() => onReview("pending2reject")}
+              />
+            &lt;/Box>
+          )}
+        &lt;/Box>
+      ) : null}
+    &lt;/Box>
+  );
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-containers_api-management.html">containers/api-management</a></li><li><a href="module-containers_completions.html">containers/completions</a></li><li><a href="module-lib_db_reads.html">lib/db/reads</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-lib_hooks.html">lib/hooks</a></li><li><a href="module-tests.html">tests</a></li></ul><h3>Global</h3><ul><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#html">html</a></li><li><a href="global.html#text">text</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sat Dec 16 2023 22:50:16 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
