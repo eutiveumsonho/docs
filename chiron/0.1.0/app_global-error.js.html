@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Home</title>
+    <title>JSDoc: Source: app/global-error.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,32 +17,42 @@
 
 <div id="main">
 
-    <h1 class="page-title">Home</h1>
+    <h1 class="page-title">Source: app/global-error.js</h1>
 
     
 
 
 
     
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module app/global-error */
+"use client";
 
+import * as Sentry from "@sentry/nextjs";
+import Error from "next/error";
+import { useEffect } from "react";
 
-    <h3>chiron 0.1.0</h3>
+/**
+ * A custom error component that reports errors to Sentry.
+ */
+export default function GlobalError({ error }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
 
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
+  return (
+    &lt;html>
+      &lt;body>
+        {/* This is the default Next.js error component. */}
+        &lt;Error />
+      &lt;/body>
+    &lt;/html>
+  );
+}
+</code></pre>
+        </article>
+    </section>
 
 
 
