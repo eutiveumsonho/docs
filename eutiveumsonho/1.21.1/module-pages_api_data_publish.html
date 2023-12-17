@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/dreams/[dreamId].js</title>
+    <title>JSDoc: Module: pages/api/data/publish</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,148 +17,191 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/dreams/[dreamId].js</h1>
+    <h1 class="page-title">Module: pages/api/data/publish</h1>
 
     
 
 
 
+
+<section>
+
+<header>
     
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>/** @module pages/dreams/:dreamId */
-import Head from "next/head";
-import Dream from "../../containers/dream";
-import { getAuthProps } from "../../lib/auth";
-import { truncate } from "../../lib/strings";
-import {
-  getDreamById,
-  getUserByEmail,
-  getUserById,
-  getComments,
-} from "../../lib/db/reads";
-import { getUserAgentProps } from "../../lib/user-agent";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+</header>
 
-/**
- * Dream page. This page shows a user's dream.
- *
- * @param {{ data, comments, serverSession }} props - The props this component gets from getServerSideProps
- */
-export default function DreamPage(props) {
-  const { data: rawData, comments: rawComments, ...authProps } = props;
+<article>
+    <div class="container-overview">
+    
+        
 
-  const data = JSON.parse(rawData);
-  const comments = JSON.parse(rawComments);
+        
 
-  return (
-    &lt;>
-      &lt;Head>
-        &lt;title>{truncate(data.dream.text, 50, true)}&lt;/title>
-      &lt;/Head>
-      &lt;Dream data={data} comments={comments} {...authProps} />
-    &lt;/>
-  );
-}
 
-export async function getServerSideProps(context) {
-  const authProps = await getAuthProps(context);
-  const { res } = context;
+<dl class="details">
 
-  try {
-    const { dreamId } = context.params;
+    
 
-    if (!authProps.props.serverSession) {
-      const data = await getDreamById(dreamId);
+    
 
-      if (data.visibility === "private") {
-        res.setHeader("location", `/${context.locale}`);
-        res.statusCode = 302;
-        res.end();
+    
 
-        return { props: {} };
-      }
+    
 
-      const user = await getUserById(data.userId);
-      data.user = user;
+    
 
-      const comments = await getComments(dreamId);
+    
 
-      return {
-        props: {
-          ...authProps.props,
-          data: JSON.stringify(data),
-          comments: JSON.stringify(comments),
-          ...getUserAgentProps(context),
-          ...(await serverSideTranslations(context.locale, [
-            "layout",
-            "footer",
-            "common",
-          ])),
-        },
-      };
-    }
+    
 
-    let [data, user] = await Promise.all([
-      getDreamById(dreamId),
-      getUserByEmail(authProps.props.serverSession.user.email),
-    ]);
+    
 
-    const isDreamOwner = user._id.toString() === data.userId.toString();
+    
 
-    if (data.visibility === "private" &amp;&amp; !isDreamOwner) {
-      res.setHeader("location", `/${context.locale}/dreams`);
-      res.statusCode = 302;
-      res.end();
+    
 
-      return {
-        props: {
-          ...getUserAgentProps(context),
-          ...(await serverSideTranslations(context.locale, [
-            "dashboard",
-            "common",
-          ])),
-        },
-      };
-    }
+    
 
-    if (data.visibility === "anonymous") {
-      delete data.userId;
-    } else {
-      if (isDreamOwner) {
-        data.user = user;
-      } else {
-        const user = await getUserById(data.userId);
-        data.user = user;
-      }
-    }
+    
 
-    const comments = await getComments(dreamId);
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pages_api_data_publish.js.html">pages/api/data/publish.js</a>, <a href="pages_api_data_publish.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
 
-    return {
-      props: {
-        ...authProps.props,
-        data: JSON.stringify(data),
-        comments: JSON.stringify(comments),
-        ...getUserAgentProps(context),
-        ...(await serverSideTranslations(context.locale, [
-          "dashboard",
-          "common",
-        ])),
-      },
-    };
-  } catch (error) {
-    console.error({
-      error,
-      service: "web",
-      pathname: "/sonhos/[dreamId]",
-      component: "DreamPage",
-    });
-  }
-}
-</code></pre>
-        </article>
-    </section>
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~publishHandler"><span class="type-signature">(inner) </span>publishHandler<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">This endpoint is responsible for enabling users to control the visibility of their dreams.</p>
+    
+
+
+
+<div class="description">
+    <p>This endpoint is responsible for enabling users to control the visibility of their dreams.
+To publish a dream means to make it visible to other users, either publicly visible,
+or anonymously visible. Users can also hide dreams from other users ('private' is the defaut
+visbility mode).</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pages_api_data_publish.js.html">pages/api/data/publish.js</a>, <a href="pages_api_data_publish.js.html#line17">line 17</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
 
 
 
