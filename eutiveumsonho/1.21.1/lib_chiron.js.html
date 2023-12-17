@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/auth/error.js</title>
+    <title>JSDoc: Source: lib/chiron.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/auth/error.js</h1>
+    <h1 class="page-title">Source: lib/chiron.js</h1>
 
     
 
@@ -26,96 +26,21 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>/** @module pages/api/auth/error */
-import { Box, Button, Card, Heading, Text } from "grommet";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import Clouds from "../../components/clouds";
-import { Logo } from "../../components/logo";
-import { NEXT_AUTH_ERRORS, _NEXT_AUTH_ERRORS } from "../../lib/errors";
-import { useTranslation } from "next-i18next";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
-
-/**
- * This page is shown when the user encounters an error while signing up or signing in.
+            <pre class="prettyprint source linenums"><code>/**
+ * Hit Chiron with data for AI training.
+ * What is Chiron? Read below 👇
+ * @link https://github.com/eutiveumsonho/chiron
  */
-export default function Error() {
-  const { query, push, locale } = useRouter();
-  const { t } = useTranslation("errors");
-
-  const { error: errorCode } = query;
-
-  console.error({
-    service: "web",
-    pathname: "/auth/error",
-    component: "VerifyRequest",
-    error_message: _NEXT_AUTH_ERRORS[errorCode],
-  });
-
-  return (
-    &lt;>
-      &lt;Head>
-        &lt;title>{t("errored")}&lt;/title>
-      &lt;/Head>
-      &lt;Clouds />
-      &lt;Box
-        pad="large"
-        align="center"
-        gap="medium"
-        width="large"
-        justify="center"
-        style={{
-          display: "flex",
-          height: "90vh",
-          margin: "auto",
-        }}
-      >
-        &lt;Card
-          pad="large"
-          gap="medium"
-          align="center"
-          background="white"
-          style={{
-            minWidth: "24rem",
-          }}
-        >
-          &lt;Logo />
-          &lt;Heading
-            level={2}
-            style={{
-              marginBottom: 0,
-            }}
-          >
-            {t("errored")}
-          &lt;/Heading>
-          &lt;Text
-            style={{
-              marginBottom: "1.5rem",
-            }}
-          >
-            {NEXT_AUTH_ERRORS[errorCode][locale]}
-          &lt;/Text>
-          &lt;Button
-            key={"back-to-site"}
-            style={{
-              width: "100%",
-            }}
-            onClick={() => push(`/${locale}`)}
-            label={t("back-to-site")}
-            primary
-          />
-        &lt;/Card>
-      &lt;/Box>
-    &lt;/>
-  );
-}
-
-export async function getServerSideProps(context) {
-  return {
-    props: {
-      ...(await serverSideTranslations(context.locale, ["errors", "common"])),
+export async function hitChiron(data) {
+  return fetch(process.env.CHIRON_URL + "/api/data/completions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apiKey: process.env.CHIRON_API_KEY,
+      vendorId: process.env.CHIRON_VENDOR_ID,
     },
-  };
+    body: JSON.stringify(data),
+  });
 }
 </code></pre>
         </article>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/auth/error.js</title>
+    <title>JSDoc: Source: pages/api/data/completions-review.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/auth/error.js</h1>
+    <h1 class="page-title">Source: pages/api/data/completions-review.js</h1>
 
     
 
@@ -26,97 +26,108 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>/** @module pages/api/auth/error */
-import { Box, Button, Card, Heading, Text } from "grommet";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import Clouds from "../../components/clouds";
-import { Logo } from "../../components/logo";
-import { NEXT_AUTH_ERRORS, _NEXT_AUTH_ERRORS } from "../../lib/errors";
-import { useTranslation } from "next-i18next";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+            <pre class="prettyprint source linenums"><code>// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
+
+import { getDreamById, hasCommentedOnDream } from "../../../lib/db/reads";
+import { createComment, generateCompletion } from "../../../lib/db/writes";
+import {
+  BAD_REQUEST,
+  METHOD_NOT_ALLOWED,
+  SERVER_ERROR,
+} from "../../../lib/errors";
 
 /**
- * This page is shown when the user encounters an error while signing up or signing in.
+ * This endpoint is hit by Chiron after a review is completed.
+ * To learn more about Chiron, visit:
+ * @link https://github.com/eutiveumsonho/chiron
  */
-export default function Error() {
-  const { query, push, locale } = useRouter();
-  const { t } = useTranslation("errors");
-
-  const { error: errorCode } = query;
-
-  console.error({
-    service: "web",
-    pathname: "/auth/error",
-    component: "VerifyRequest",
-    error_message: _NEXT_AUTH_ERRORS[errorCode],
-  });
-
-  return (
-    &lt;>
-      &lt;Head>
-        &lt;title>{t("errored")}&lt;/title>
-      &lt;/Head>
-      &lt;Clouds />
-      &lt;Box
-        pad="large"
-        align="center"
-        gap="medium"
-        width="large"
-        justify="center"
-        style={{
-          display: "flex",
-          height: "90vh",
-          margin: "auto",
-        }}
-      >
-        &lt;Card
-          pad="large"
-          gap="medium"
-          align="center"
-          background="white"
-          style={{
-            minWidth: "24rem",
-          }}
-        >
-          &lt;Logo />
-          &lt;Heading
-            level={2}
-            style={{
-              marginBottom: 0,
-            }}
-          >
-            {t("errored")}
-          &lt;/Heading>
-          &lt;Text
-            style={{
-              marginBottom: "1.5rem",
-            }}
-          >
-            {NEXT_AUTH_ERRORS[errorCode][locale]}
-          &lt;/Text>
-          &lt;Button
-            key={"back-to-site"}
-            style={{
-              width: "100%",
-            }}
-            onClick={() => push(`/${locale}`)}
-            label={t("back-to-site")}
-            primary
-          />
-        &lt;/Card>
-      &lt;/Box>
-    &lt;/>
-  );
+function completionsReviewHandler(req, res) {
+  switch (req.method) {
+    case "POST":
+      return post(req, res);
+    default:
+      res.setHeader("Allow", ["POST"]);
+      res.status(405).end(METHOD_NOT_ALLOWED);
+      return res;
+  }
 }
 
-export async function getServerSideProps(context) {
-  return {
-    props: {
-      ...(await serverSideTranslations(context.locale, ["errors", "common"])),
-    },
-  };
+/**
+ * @private
+ */
+async function post(req, res) {
+  if (!req.body?.completion || !req.body?.dreamId) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  const hasCommented = await hasCommentedOnDream("Sonia", req.body.dreamId);
+
+  if (hasCommented) {
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send("OK");
+    return res;
+  }
+
+  const { completion, dreamId } = req.body;
+
+  try {
+    // The "approved" property is always set by a human to `true` through Chiron,
+    // while "pendingReview" is set to `false`, also by a human.
+    // See https://github.com/eutiveumsonho/internal-docs for more details about
+    // this workflow.
+    if (!req.body.pendingReview &amp;&amp; !req.body.approved) {
+      const dreamData = await getDreamById(dreamId);
+
+      await generateCompletion(
+        dreamId,
+        dreamData.dream.text,
+        undefined,
+        dreamData.userId
+      );
+
+      res.setHeader("Content-Type", "application/json");
+      res.status(202).send("Accepted");
+
+      return res;
+    }
+
+    // TODO: Update the reviwed completion
+
+    const data = {
+      comment: completion.choices[0].message.content,
+      dreamId,
+      session: {
+        user: {
+          name: "Sonia",
+          email: "no-reply@eutiveumsonho.com",
+          image: "https://eutiveumsonho.com/android-chrome-192x192.png",
+        },
+        expires: new Date(8640000000000000), // Maximum timestamp,
+      },
+    };
+
+    // Once the completion is approved, we can generate a comment.
+    await createComment(data);
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send("Created");
+
+    return res;
+  } catch (error) {
+    console.error({
+      error,
+      service: "api",
+      pathname: "/api/data/completions-review",
+      method: "post",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
 }
+
+export default completionsReviewHandler;
 </code></pre>
         </article>
     </section>
