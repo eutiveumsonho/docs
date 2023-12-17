@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: containers/api-management.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: containers/api-management.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module containers/api-management */
+"use client";
+
+import Empty from "@/components/empty";
+import { FormPopUp } from "@/components/form";
+import {
+  Box,
+  Button,
+  FormField,
+  Heading,
+  List,
+  Menu,
+  Text,
+  TextInput,
+} from "grommet";
+import { useState } from "react";
+import { StatusGood, More } from "grommet-icons";
+import { useRefreshData } from "@/lib/hooks";
+
+/**
+ * The API Management container contains all logic for managing
+ * API keys for Chiron from the front-end.
+ *
+ * @param {{ vendors }} props Props received from the server
+ */
+export default function ApiManagementContainer(props) {
+  const { vendors } = props;
+  const { refresh } = useRefreshData();
+
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const onOpen = () => setOpen(true);
+  const onClose = () => setOpen(false);
+
+  const onSubmit = async (event) => {
+    setSubmitting(true);
+    const {
+      value: { vendorName, vendorUrl, vendorCallbackUrl },
+    } = event;
+
+    const formattedUrl = new URL(vendorUrl);
+
+    const data = {
+      vendorName,
+      vendorUrl: formattedUrl.origin,
+      vendorCallbackUrl,
+    };
+
+    const response = await fetch("/api/vendors", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+
+    if (response.ok) {
+      onClose();
+
+      const data = await response.json();
+
+      prompt(
+        `
+      This is the only time you will see this API key,
+      so make sure you copy it and store it somewhere safe.`,
+        JSON.stringify(data),
+      );
+
+      refresh();
+    }
+
+    setSubmitting(false);
+  };
+
+  if (!vendors || vendors.length === 0) {
+    return (
+      &lt;>
+        &lt;Empty
+          empty={{
+            description: "No vendors available to manage yet",
+            label: "Create one 🆕",
+            callback: onOpen,
+          }}
+        />
+        &lt;Form
+          open={open}
+          onClose={onClose}
+          onSubmit={onSubmit}
+          submitting={submitting}
+        />
+      &lt;/>
+    );
+  }
+
+  return (
+    &lt;>
+      &lt;Heading>API Management&lt;/Heading>
+      &lt;Button label="Add" onClick={onOpen} />
+      &lt;br />
+      &lt;List
+        data={vendors}
+        primaryKey={(item) => (
+          &lt;Text key={item.name} size="large" weight="bold">
+            {item.name}
+          &lt;/Text>
+        )}
+        secondaryKey={(item) => (
+          &lt;Text key={item.callbackUrl} size="small" color="dark-4">
+            Callback URL: {item.callbackUrl}
+          &lt;/Text>
+        )}
+        itemKey={(item) => item.name}
+        pad={{ left: "small", right: "none" }}
+        action={(item, index) => (
+          &lt;Menu
+            key={index}
+            icon={&lt;More />}
+            hoverIndicator
+            items={[{ label: "Delete" }]}
+          />
+        )}
+      />
+      &lt;Form
+        open={open}
+        onClose={onClose}
+        onSubmit={onSubmit}
+        submitting={submitting}
+      />
+    &lt;/>
+  );
+}
+
+function Form(props) {
+  const { onClose, open, onSubmit, submitting } = props;
+
+  return (
+    &lt;FormPopUp
+      open={open}
+      onClose={onClose}
+      heading={"Add"}
+      onSubmit={onSubmit}
+      submitting={submitting}
+    >
+      &lt;FormField
+        label="Vendor Name"
+        name="vendorName"
+        required
+        validate={[
+          { regexp: /^[a-z]/i },
+          (name) => {
+            if (name &amp;&amp; name.length === 1) return "must be >1 character";
+            return undefined;
+          },
+          () => {
+            return {
+              message: (
+                &lt;Box align="end">
+                  &lt;StatusGood />
+                &lt;/Box>
+              ),
+              status: "info",
+            };
+          },
+        ]}
+      >
+        &lt;TextInput name="vendorName" />
+      &lt;/FormField>
+      &lt;FormField
+        label="Vendor URL"
+        name="vendorUrl"
+        required
+        validate={[
+          (url) => {
+            try {
+              new URL(url);
+            } catch (error) {
+              console.error(error);
+              return "must be a valid url";
+            }
+          },
+          () => {
+            return {
+              message: (
+                &lt;Box align="end">
+                  &lt;StatusGood />
+                &lt;/Box>
+              ),
+              status: "info",
+            };
+          },
+        ]}
+      >
+        &lt;TextInput name="vendorUrl" aria-label="url" type="url" />
+      &lt;/FormField>
+      &lt;FormField
+        label="Callback URL"
+        name="vendorCallbackUrl"
+        required
+        validate={[
+          (url) => {
+            try {
+              new URL(url);
+            } catch (error) {
+              console.error(error);
+              return "must be a valid url";
+            }
+          },
+          () => {
+            return {
+              message: (
+                &lt;Box align="end">
+                  &lt;StatusGood />
+                &lt;/Box>
+              ),
+              status: "info",
+            };
+          },
+        ]}
+      >
+        &lt;TextInput name="vendorCallbackUrl" aria-label="url" type="url" />
+      &lt;/FormField>
+    &lt;/FormPopUp>
+  );
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-app_global-error.html">app/global-error</a></li><li><a href="module-containers_api-management.html">containers/api-management</a></li><li><a href="module-containers_completions.html">containers/completions</a></li><li><a href="module-lib_db_reads.html">lib/db/reads</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-lib_hooks.html">lib/hooks</a></li><li><a href="module-tests.html">tests</a></li></ul><h3>Global</h3><ul><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#html">html</a></li><li><a href="global.html#text">text</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 17 2023 23:52:36 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

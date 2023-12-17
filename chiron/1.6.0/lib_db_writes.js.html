@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/db/writes.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/db/writes.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module lib/db/writes */
+
+import { ObjectId } from "bson";
+import {
+  getApiKeysCollection,
+  getApprovedCompletionsCollection,
+  getCompletionsPendingReviewCollection,
+  getRejectedCompletionsCollection,
+} from "../mongodb";
+
+/**
+ * Approves a completion.
+ *
+ * @param data The completion data to approve.
+ */
+async function approveCompletion(data) {
+  const [collection, approvedCollection] = await Promise.all([
+    getCompletionsPendingReviewCollection(),
+    getApprovedCompletionsCollection(),
+  ]);
+
+  const id = data._id;
+  delete data._id;
+
+  const approvedResult = await approvedCollection.insertOne(data);
+  await collection.deleteOne({ _id: new ObjectId(id) });
+
+  return approvedResult;
+}
+
+/**
+ * Rejects a completion.
+ *
+ * @param data The completion data to reject.
+ */
+async function rejectCompletion(data) {
+  const [collection, rejectedCollection] = await Promise.all([
+    getCompletionsPendingReviewCollection(),
+    getRejectedCompletionsCollection(),
+  ]);
+
+  const id = data._id;
+  delete data._id;
+
+  const rejectedResult = await rejectedCollection.insertOne(data);
+  await collection.deleteOne({ _id: new ObjectId(id) });
+
+  return rejectedResult;
+}
+
+async function approve2Reject(data) {
+  const [collection, rejectedCollection] = await Promise.all([
+    getApprovedCompletionsCollection(),
+    getRejectedCompletionsCollection(),
+  ]);
+
+  const id = data._id;
+  delete data._id;
+
+  const rejectedResult = await rejectedCollection.insertOne(data);
+  await collection.deleteOne({ _id: new ObjectId(id) });
+
+  return rejectedResult;
+}
+
+async function reject2Approve(data) {
+  const [collection, approvedCollection] = await Promise.all([
+    getRejectedCompletionsCollection(),
+    getApprovedCompletionsCollection(),
+  ]);
+
+  const id = data._id;
+  delete data._id;
+  const approvedResult = await approvedCollection.insertOne(data);
+  await collection.deleteOne({ _id: new ObjectId(id) });
+
+  return approvedResult;
+}
+
+/**
+ * Starts a review pipeline for a completion.
+ *
+ * @param data The completion data to review
+ * @param {"pending2approve" | "pending2reject" | "approve2reject" | "reject2Approve"} direction Direction of the review
+ */
+export async function reviewCompletion(data, direction) {
+  // TODO: Does approve2pending; reject2pending make sense?
+  switch (direction) {
+    case "pending2approve":
+      return approveCompletion(data);
+    case "pending2reject":
+      return rejectCompletion(data);
+    // TODO: Support these use cases on the front-end, eventually
+    case "approve2reject":
+      return approve2Reject(data);
+    case "reject2approve":
+      return reject2Approve(data);
+    default:
+      throw new Error("Invalid direction");
+  }
+}
+
+/**
+ * Saves a completion to the database for review.
+ *
+ * @param completionData Completion data to save
+ */
+export async function saveCompletion(completionData) {
+  const collection = await getCompletionsPendingReviewCollection();
+
+  const result = await collection.insertOne(completionData);
+
+  return result;
+}
+
+/**
+ * Inserts an API key created from the API Management page into the database.
+ *
+ * @param  data The API key data to save.
+ */
+export async function saveApiKeys(data) {
+  const collection = await getApiKeysCollection();
+
+  const result = await collection.insertOne({
+    ...data,
+    createdAt: new Date().toISOString(),
+  });
+
+  return result;
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-app_global-error.html">app/global-error</a></li><li><a href="module-containers_api-management.html">containers/api-management</a></li><li><a href="module-containers_completions.html">containers/completions</a></li><li><a href="module-lib_db_reads.html">lib/db/reads</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-lib_hooks.html">lib/hooks</a></li><li><a href="module-tests.html">tests</a></li></ul><h3>Global</h3><ul><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#html">html</a></li><li><a href="global.html#text">text</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 17 2023 23:52:36 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

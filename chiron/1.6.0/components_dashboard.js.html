@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: components/dashboard.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: components/dashboard.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>"use client";
+
+import React, { cloneElement, useContext } from "react";
+import {
+  Avatar,
+  Button,
+  Box,
+  Nav,
+  Text,
+  Sidebar as SidebarBase,
+  Header,
+  Page,
+  PageContent,
+  ResponsiveContext,
+  Grommet,
+  grommet,
+} from "grommet";
+import { Logout, DocumentTest, Contract } from "grommet-icons";
+import { BRAND_HEX } from "../lib/config";
+import { Logo } from "./logo";
+import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
+
+const MOBILE_SIDEBAR_WIDTH = "4.5rem";
+const MOBILE_HEADER_HEIGHT = "3.95rem";
+const DESKTOP_SIDEBAR_WIDTH = "15rem";
+const DESKTOP_HEADER_HEIGHT = "4.688rem";
+
+const SidebarHeader = (props) => {
+  const { serverSession, size, deviceType } = props;
+
+  const isSmall = deviceType === "mobile" || size === "small";
+
+  return (
+    &lt;Box
+      align="center"
+      gap="small"
+      direction="row"
+      margin={{ bottom: "xxsmall" }}
+      justify="center"
+    >
+      {serverSession?.user?.image ? (
+        &lt;Avatar src={serverSession.user.image} />
+      ) : null}
+      {isSmall ? null : &lt;Text>{serverSession?.user?.name}&lt;/Text>}
+    &lt;/Box>
+  );
+};
+
+const SidebarButton = ({ icon, label, selected, ...rest }) => (
+  &lt;Button
+    gap="medium"
+    justify="start"
+    fill
+    icon={cloneElement(icon, {
+      color: selected ? "white" : undefined,
+    })}
+    label={label}
+    plain
+    {...rest}
+    style={{
+      ...rest.style,
+      whiteSpace: "nowrap",
+      height: "3rem",
+      paddingLeft: "2rem",
+      flex: "unset",
+      background: selected ? BRAND_HEX : "transparent",
+      color: selected ? "white" : "unset",
+    }}
+  />
+);
+
+const SidebarFooter = (props) => {
+  const { size, deviceType } = props;
+
+  const { push } = useRouter();
+  const pathname = usePathname();
+
+  const apiManagement = "/api-management";
+
+  if (deviceType === "mobile" || size === "small") {
+    return (
+      &lt;Nav gap="small">
+        &lt;Button
+          icon={&lt;Contract />}
+          hoverIndicator={pathname !== apiManagement}
+          primary={pathname === apiManagement}
+          onClick={() => push(apiManagement)}
+        />
+        &lt;Button
+          icon={&lt;Logout />}
+          hoverIndicator
+          onClick={async () => {
+            await signOut({
+              redirect: true,
+            });
+          }}
+        />
+      &lt;/Nav>
+    );
+  }
+
+  return (
+    &lt;Nav>
+      &lt;SidebarButton
+        icon={&lt;Contract />}
+        label={"API Management"}
+        selected={pathname === apiManagement}
+        onClick={() => push(apiManagement)}
+      />
+      &lt;SidebarButton
+        icon={&lt;Logout />}
+        label={"Logout"}
+        onClick={async () => {
+          await signOut({
+            redirect: true,
+          });
+        }}
+      />
+    &lt;/Nav>
+  );
+};
+
+/**
+ * Navigation items are organized by
+ * usage order (data from G.A.)
+ */
+const MainNavigation = (props) => {
+  const { size, deviceType } = props;
+  const { push } = useRouter();
+  const pathname = usePathname();
+
+  const completions = "/completions/";
+
+  const matchCompletions = pathname.includes(completions);
+
+  if (deviceType === "mobile" || size === "small") {
+    return (
+      &lt;Nav gap="small">
+        &lt;Button
+          icon={&lt;DocumentTest />}
+          hoverIndicator={!matchCompletions}
+          primary={matchCompletions}
+          onClick={() => push(completions + "pending")}
+        />
+      &lt;/Nav>
+    );
+  }
+
+  return (
+    &lt;Nav gap="medium" fill="vertical" responsive={false}>
+      &lt;SidebarButton
+        icon={&lt;DocumentTest />}
+        label={"Completions"}
+        selected={matchCompletions}
+        onClick={() => push(completions + "pending")}
+      />
+    &lt;/Nav>
+  );
+};
+
+function MobileSidebar(props) {
+  const { serverSession, size } = props;
+
+  return (
+    &lt;SidebarBase
+      elevation="large"
+      responsive={false}
+      background="light-1"
+      header={
+        &lt;SidebarHeader
+          serverSession={serverSession}
+          size={size}
+          deviceType={"mobile"}
+        />
+      }
+      footer={&lt;SidebarFooter size={size} deviceType="mobile" />}
+      style={{
+        top: MOBILE_HEADER_HEIGHT,
+        height: `calc(100vh - ${MOBILE_HEADER_HEIGHT})`,
+        minHeight: `calc(100vh - ${MOBILE_HEADER_HEIGHT})`,
+        position: "fixed",
+        minWidth: MOBILE_SIDEBAR_WIDTH,
+        maxWidth: MOBILE_SIDEBAR_WIDTH,
+        borderRight: `1px solid ${BRAND_HEX}`,
+        // Trick to make the box-shadow from the sidebar and header look good
+        zIndex: "11",
+      }}
+    >
+      &lt;MainNavigation
+        size={size}
+        serverSession={serverSession}
+        deviceType={"mobile"}
+      />
+    &lt;/SidebarBase>
+  );
+}
+
+function DesktopSidebar(props) {
+  const { serverSession, size } = props;
+
+  return (
+    &lt;SidebarBase
+      responsive={false}
+      elevation="large"
+      header={
+        &lt;SidebarHeader
+          serverSession={serverSession}
+          size={size}
+          deviceType={"desktop"}
+        />
+      }
+      footer={&lt;SidebarFooter deviceType="desktop" />}
+      pad={{ left: "unset", right: "unset", vertical: "large" }}
+      background="light-1"
+      style={{
+        position: "fixed",
+        top: DESKTOP_HEADER_HEIGHT,
+        height: `calc(100vh - ${DESKTOP_HEADER_HEIGHT})`,
+        minHeight: `calc(100vh - ${DESKTOP_HEADER_HEIGHT})`,
+        minWidth: DESKTOP_SIDEBAR_WIDTH,
+        maxWidth: DESKTOP_SIDEBAR_WIDTH,
+        borderRight: `1px solid ${BRAND_HEX}`,
+        // Trick to make the box-shadow from the sidebar and header look good
+        zIndex: "11",
+      }}
+    >
+      &lt;MainNavigation size={size} serverSession={serverSession} />
+    &lt;/SidebarBase>
+  );
+}
+
+function Sidebar(props) {
+  const { serverSession, size, deviceType } = props;
+
+  if (deviceType === "mobile" || size === "small") {
+    return (
+      &lt;MobileSidebar
+        serverSession={serverSession}
+        size={size}
+        deviceType={deviceType}
+      />
+    );
+  }
+
+  return (
+    &lt;DesktopSidebar
+      serverSession={serverSession}
+      size={size}
+      deviceType={deviceType}
+    />
+  );
+}
+
+export default function Dashboard(props) {
+  const { serverSession, children, deviceType } = props;
+  const size = useContext(ResponsiveContext);
+
+  const isSmall = deviceType === "mobile" || size === "small";
+
+  return (
+    &lt;>
+      &lt;Grommet
+        full
+        theme={grommet}
+        style={{
+          overflow: "hidden",
+        }}
+      >
+        &lt;Header
+          pad="small"
+          style={{
+            position: "fixed",
+            width: "100vw",
+            borderBottom: `1px solid ${BRAND_HEX}`,
+            zIndex: "10",
+          }}
+          background="light-1"
+          elevation="large"
+        >
+          &lt;Box
+            style={{
+              display: "flex",
+              width: "100%",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              margin: "auto",
+              maxWidth: "96rem",
+              // Trick to make the box-shadow from the sidebar and header look good
+              zIndex: "9",
+            }}
+          >
+            &lt;Logo noTitle />
+          &lt;/Box>
+        &lt;/Header>
+        &lt;Page background="background-front" kind="full">
+          &lt;Box direction="row" height={{ min: "100%" }}>
+            &lt;Sidebar
+              serverSession={serverSession}
+              size={size}
+              deviceType={deviceType}
+            />
+            &lt;PageContent
+              pad="medium"
+              style={{
+                width: isSmall
+                  ? `calc(100vw - ${MOBILE_SIDEBAR_WIDTH})`
+                  : `calc(100vw - ${DESKTOP_SIDEBAR_WIDTH})`,
+                minHeight: isSmall
+                  ? `calc(100vh - ${MOBILE_HEADER_HEIGHT})`
+                  : `calc(100vh - ${DESKTOP_HEADER_HEIGHT})`,
+                maxHeight: isSmall
+                  ? `calc(100vh - ${MOBILE_HEADER_HEIGHT})`
+                  : `calc(100vh - ${DESKTOP_HEADER_HEIGHT})`,
+                minWidth: "0px",
+                marginTop: isSmall
+                  ? MOBILE_HEADER_HEIGHT
+                  : DESKTOP_HEADER_HEIGHT,
+                marginLeft: isSmall
+                  ? MOBILE_SIDEBAR_WIDTH
+                  : DESKTOP_SIDEBAR_WIDTH,
+                overflow: "auto",
+              }}
+            >
+              {children}
+            &lt;/PageContent>
+          &lt;/Box>
+        &lt;/Page>
+      &lt;/Grommet>
+    &lt;/>
+  );
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-app_global-error.html">app/global-error</a></li><li><a href="module-containers_api-management.html">containers/api-management</a></li><li><a href="module-containers_completions.html">containers/completions</a></li><li><a href="module-lib_db_reads.html">lib/db/reads</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-lib_hooks.html">lib/hooks</a></li><li><a href="module-tests.html">tests</a></li></ul><h3>Global</h3><ul><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#html">html</a></li><li><a href="global.html#text">text</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 17 2023 23:52:36 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
