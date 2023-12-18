@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/db/writes.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/db/writes.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { ObjectID } from "bson";
+import {
+  getDreamsCollection,
+  getUsersCollection,
+  getAccountsCollection,
+  getCommentsCollection,
+  getStarsCollection,
+  getInboxCollection,
+  getCompletionsCollection,
+} from "../mongodb";
+import { encryptDream } from "../transformations";
+import { isDreamOwner } from "../validations";
+import {
+  getCommentById,
+  getCommentsByUserId,
+  getDreamById,
+  getStar,
+  getStarsByUserEmail,
+  getUserByEmail,
+  getUserById,
+  hasAiCommentedOnDream,
+} from "./reads";
+import { getInsights } from "../insights";
+import { v4 as uuid } from "uuid";
+import OpenAI from "openai";
+import { hitChiron } from "../chiron";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_TOKEN,
+});
+
+/**
+ * @todo document this
+ */
+export async function createDream(data) {
+  const { dream: dreamData, session } = data;
+
+  const [user, collection] = await Promise.all([
+    getUserByEmail(session.user.email),
+    getDreamsCollection(),
+  ]);
+
+  const insights = getInsights(dreamData.dream.text);
+
+  const encryptedDream = encryptDream(dreamData.dream);
+
+  const result = await collection.insertOne({
+    dream: encryptedDream,
+    userId: ObjectID(user._id),
+    createdAt: new Date().toISOString(),
+    lastUpdatedAt: new Date().toISOString(),
+    visibility: "private",
+    commentCount: 0,
+    starCount: 0,
+    ...insights,
+  });
+
+  return result;
+}
+
+/**
+ * @todo document this
+ */
+export async function updateDream(dreamId, rawDreamData, userEmail) {
+  const [collection, user, dreamData] = await Promise.all([
+    getDreamsCollection(),
+    getUserByEmail(userEmail),
+    getDreamById(dreamId),
+  ]);
+
+  if (!isDreamOwner(dreamData, user)) {
+    console.warn("User is not the dream owner");
+
+    return null;
+  }
+
+  let possiblyUpdatedDream = rawDreamData.dream;
+  const insights = getInsights(rawDreamData.dream.text);
+
+  if (dreamData.visibility === "private") {
+    possiblyUpdatedDream = encryptDream(rawDreamData.dream);
+  }
+
+  const result = await collection.updateOne(
+    {
+      _id: ObjectID(dreamId),
+    },
+    {
+      $set: {
+        dream: possiblyUpdatedDream,
+        ...insights,
+        lastUpdatedAt: new Date().toISOString(),
+      },
+    }
+  );
+
+  return result;
+}
+
+/**
+ * Method responsible for updating a dream's visibility.
+ * In case a dream is going from public to private and doesn't
+ * have an AI input, it also generates one.
+ *
+ * @param {string} dreamId - The dream's ID
+ * @param {string} visibility - "public" or "private"
+ * @param {string} userEmail - The dream owner user's email
+ * @returns {Promise&lt;{ success: boolean }>}
+ */
+export async function updateDreamVisibility(dreamId, visibility, userEmail) {
+  const [collection, user, dreamData] = await Promise.all([
+    getDreamsCollection(),
+    getUserByEmail(userEmail),
+    getDreamById(dreamId),
+  ]);
+
+  if (!isDreamOwner(dreamData, user)) {
+    return null;
+  }
+
+  if (dreamData.visibility !== "private" &amp;&amp; visibility !== "private") {
+    const result = await collection.updateOne(
+      {
+        _id: ObjectID(dreamId),
+      },
+      {
+        $set: { visibility, lastUpdatedAt: new Date().toISOString() },
+      }
+    );
+
+    return result;
+  }
+
+  if (dreamData.visibility === "private" &amp;&amp; visibility !== "private") {
+    const hasCommented = await hasAiCommentedOnDream(dreamId);
+
+    if (!hasCommented) {
+      console.log("Generating completion from workflow #3");
+      await generateCompletion(
+        dreamId,
+        dreamData.dream.text,
+        undefined,
+        user._id
+      );
+    }
+
+    const result = await collection.updateOne(
+      {
+        _id: ObjectID(dreamId),
+      },
+      {
+        $set: {
+          // At this point the dream is already decrypted, see getDreamById
+          dream: dreamData.dream,
+          visibility,
+          lastUpdatedAt: new Date().toISOString(),
+        },
+      }
+    );
+
+    return result;
+  }
+
+  const encryptedDream = encryptDream(dreamData.dream);
+
+  const result = await collection.updateOne(
+    {
+      _id: ObjectID(dreamId),
+    },
+    {
+      $set: {
+        dream: encryptedDream,
+        visibility,
+        lastUpdatedAt: new Date().toISOString(),
+      },
+    }
+  );
+
+  return result;
+}
+
+/**
+ * Method responsible for deleting a dream.
+ *
+ * @function
+ * @param {string} dreamId - The dream's ID
+ * @returns {Promise&lt;{ success: boolean }>}
+ */
+export async function deleteDream(dreamId) {
+  const [collection, commentsCollection, starsCollection] = await Promise.all([
+    getDreamsCollection(),
+    getCommentsCollection(),
+    getStarsCollection(),
+  ]);
+
+  try {
+    await Promise.all([
+      collection.deleteOne({
+        _id: ObjectID(dreamId),
+      }),
+      commentsCollection.deleteMany({
+        dreamId: ObjectID(dreamId),
+      }),
+      starsCollection.deleteMany({
+        dreamId: ObjectID(dreamId),
+      }),
+    ]);
+
+    return { success: true };
+  } catch (error) {
+    console.error({ error, service: "db", component: "deleteDream" });
+    return { success: false };
+  }
+}
+
+/**
+ * Method responsible for deleting a user's account.
+ * This method is called when a user deletes their account.
+ * It deletes all dreams, comments and stars related to the user, and the user's account.
+ *
+ * @param {string} userEmail - The user's email
+ * @returns {Promise&lt;{ success: boolean }>}
+ */
+export async function deleteAccount(userEmail) {
+  const [
+    user,
+    usersCollection,
+    dreamsCollection,
+    accountsCollection,
+    commentsCollection,
+    starsCollection,
+  ] = await Promise.all([
+    getUserByEmail(userEmail),
+    getUsersCollection(),
+    getDreamsCollection(),
+    getAccountsCollection(),
+    getCommentsCollection(),
+    getStarsCollection(),
+  ]);
+
+  if (!user) {
+    console.warn({
+      message: "No user found",
+      service: "db",
+      pathname: "deleteAccount",
+    });
+    return { success: false };
+  }
+
+  try {
+    const comments = await getCommentsByUserId(user._id);
+    const stars = await getStarsByUserEmail(user.email);
+
+    await Promise.all([
+      dreamsCollection.deleteMany({ userId: ObjectID(user._id) }),
+      accountsCollection.deleteOne({ userId: ObjectID(user._id) }),
+      usersCollection.deleteOne({ email: userEmail }),
+      // Delete all comments made on this user's dreams.
+      commentsCollection.deleteMany({ dreamOwnerUserId: ObjectID(user._id) }),
+      // Delete all stars given to this user's dreams.
+      starsCollection.deleteMany({ dreamOwnerUserId: ObjectID(user._id) }),
+    ]);
+
+    // Delete comments made on other people's dreams and
+    // decrement the dream count accordingly.
+    for (const comment of comments) {
+      // Skip awaiting, update as many dream comment counts
+      // as possible as fast as possible.
+      deleteComment(comment._id, comment.dreamId);
+    }
+
+    for (const star of stars) {
+      unstarDream(star._id, star.dreamId);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error({ error, service: "db", component: "deleteAccount" });
+    return { success: false };
+  }
+}
+
+export async function updateUser(userId, data) {
+  const collection = await getUsersCollection();
+
+  const result = await collection.updateOne(
+    {
+      _id: ObjectID(userId),
+    },
+    {
+      $set: {
+        ...data,
+      },
+    }
+  );
+
+  return result;
+}
+
+/**
+ * This method is responsible for creating a comment.
+ * It also creates an inbox message for the dream owner.
+ * If the dream owner is the same as the user, no inbox message is created.
+ * It has a special case for the AI user, which is a bot that creates comments.
+ * The AI user doesn't have a database object, so it skips getting the user's database object.
+ *
+ * @param {object} data - The data object
+ * @param {string} data.comment - The comment text
+ * @param {string} data.dreamId - The dream ID
+ * @param {object} data.session - The session object
+ * @param {object} data.session.user - The user object
+ * @param {string} data.session.user.name - The user's name
+ * @param {string} data.session.user.email - The user's email
+ * @param {string} data.session.user.image - The user's image
+ * @returns {Promise&lt;{ insertedId: string }>}
+ */
+export async function createComment(data) {
+  const { comment, dreamId, session } = data;
+
+  // Skip getting user's database object because it doesn't really exist.
+  const isAIComment = session.user.name === "Sonia";
+
+  if (isAIComment) {
+    const [collection, inboxCollection] = await Promise.all([
+      getCommentsCollection(),
+      getInboxCollection(),
+    ]);
+
+    const dream = await getDreamById(dreamId);
+    const dreamOwner = await getUserById(dream.userId);
+
+    const inboxKey = uuid();
+
+    const [result, _] = await Promise.all([
+      collection.insertOne({
+        // Grab the user's name from the mocked session.
+        userId: session.user.name,
+        userName: session.user.name,
+        userEmail: session.user.email,
+        userImage: session.user.image,
+        dreamId: ObjectID(dreamId),
+        dreamOwnerUserId: ObjectID(dream.userId),
+        createdAt: new Date().toISOString(),
+        text: comment,
+        inboxKey,
+      }),
+      inboxCollection.insertOne({
+        userId: session.user.name,
+        userName: session.user.name,
+        userEmail: session.user.email,
+        userImage: session.user.image,
+        dreamId: ObjectID(dreamId),
+        dreamOwnerUserEmail: dreamOwner.email,
+        createdAt: new Date().toISOString(),
+        type: "comment",
+        read: false,
+        commentKey: inboxKey,
+      }),
+    ]);
+
+    if (result.insertedId) {
+      const dreamsCollection = await getDreamsCollection();
+
+      await dreamsCollection.updateOne(
+        {
+          _id: ObjectID(dreamId),
+        },
+        { $inc: { commentCount: 1 } }
+      );
+    }
+
+    return result;
+  }
+
+  if (!isAIComment) {
+    const [user, collection, inboxCollection] = await Promise.all([
+      getUserByEmail(session.user.email),
+      getCommentsCollection(),
+      getInboxCollection(),
+    ]);
+
+    const dream = await getDreamById(dreamId);
+    const dreamOwner = await getUserById(dream.userId);
+
+    let shouldCreateNewInbox = true;
+    if (dreamOwner.email === user.email) {
+      shouldCreateNewInbox = false;
+    }
+
+    const inboxKey = uuid();
+
+    const [result, _] = await Promise.all([
+      collection.insertOne({
+        userId: ObjectID(user._id),
+        userName: user.name,
+        userEmail: user.email,
+        userImage: user.image,
+        dreamId: ObjectID(dreamId),
+        dreamOwnerUserId: ObjectID(dream.userId),
+        createdAt: new Date().toISOString(),
+        text: comment,
+        inboxKey: shouldCreateNewInbox ? inboxKey : null,
+      }),
+      shouldCreateNewInbox
+        ? inboxCollection.insertOne({
+            userId: ObjectID(user._id),
+            userName: user.name,
+            userEmail: user.email,
+            userImage: user.image,
+            dreamId: ObjectID(dreamId),
+            dreamOwnerUserEmail: dreamOwner.email,
+            createdAt: new Date().toISOString(),
+            type: "comment",
+            read: false,
+            commentKey: inboxKey,
+          })
+        : () => null,
+    ]);
+
+    if (result.insertedId) {
+      const dreamsCollection = await getDreamsCollection();
+
+      await dreamsCollection.updateOne(
+        {
+          _id: ObjectID(dreamId),
+        },
+        { $inc: { commentCount: 1 } }
+      );
+    }
+
+    return result;
+  }
+}
+
+/**
+ * This method is responsible for deleting a comment from a dream.
+ * It also deletes the inbox message for the dream owner.
+ *
+ * @param {string} commentId - The comment ID
+ * @param {string} dreamId - The dream ID
+ * @returns {Promise&lt;any>}
+ */
+export async function deleteComment(commentId, dreamId) {
+  const [collection, dreamsCollection, inboxCollection] = await Promise.all([
+    getCommentsCollection(),
+    getDreamsCollection(),
+    getInboxCollection(),
+  ]);
+
+  const comment = await getCommentById(commentId);
+
+  return await Promise.all([
+    collection.deleteOne({ _id: ObjectID(commentId) }),
+    dreamsCollection.updateOne(
+      {
+        _id: ObjectID(dreamId),
+      },
+      { $inc: { commentCount: -1 } }
+    ),
+    inboxCollection.deleteOne({
+      userEmail: session.user.email,
+      commentKey: comment?.inboxKey,
+    }),
+  ]);
+}
+
+/**
+ * This method is responsible for starring a dream.
+ * It also creates an inbox message for the dream owner.
+ * If the dream owner is the same as the user, no inbox message is created.
+ *
+ * @param {object} data - The data object
+ * @param {string} data.dreamId - The dream ID
+ * @param {object} data.session - The session object
+ * @param {object} data.session.user - The user object
+ * @param {string} data.session.user.name - The user's name
+ * @param {string} data.session.user.email - The user's email
+ * @param {string} data.session.user.image - The user's image
+ * @returns {Promise&lt;{ insertedId: string }>}
+ */
+export async function starDream(data) {
+  const { dreamId, session } = data;
+
+  const [user, collection, inboxCollection] = await Promise.all([
+    getUserByEmail(session.user.email),
+    getStarsCollection(),
+    getInboxCollection(),
+  ]);
+
+  const dream = await getDreamById(dreamId);
+  const dreamOwner = await getUserById(dream.userId);
+
+  let shouldCreateNewInbox = true;
+  if (dreamOwner.email === user.email) {
+    shouldCreateNewInbox = false;
+  }
+
+  const inboxKey = uuid();
+
+  const [result, _] = await Promise.all([
+    collection.insertOne({
+      userId: ObjectID(user._id),
+      userName: user.name,
+      userEmail: user.email,
+      userImage: user.image,
+      dreamId: ObjectID(dreamId),
+      dreamOwnerUserId: ObjectID(dream.userId),
+      createdAt: new Date().toISOString(),
+      inboxKey: shouldCreateNewInbox ? inboxKey : null,
+    }),
+    // The only difference between the inbox
+    // and the stars collection, is that
+    // the inbox collection is ephemeral
+    shouldCreateNewInbox
+      ? inboxCollection.insertOne({
+          userId: ObjectID(user._id),
+          userName: user.name,
+          userEmail: user.email,
+          userImage: user.image,
+          dreamId: ObjectID(dreamId),
+          dreamOwnerUserEmail: dreamOwner.email,
+          createdAt: new Date().toISOString(),
+          type: "star",
+          read: false,
+          starKey: inboxKey,
+        })
+      : () => null,
+  ]);
+
+  if (result.insertedId) {
+    const dreamsCollection = await getDreamsCollection();
+
+    await dreamsCollection.updateOne(
+      {
+        _id: ObjectID(dreamId),
+      },
+      { $inc: { starCount: 1 } }
+    );
+  }
+
+  return result;
+}
+
+/**
+ * @todo document this
+ */
+export async function unstarDream(data) {
+  const { dreamId, session } = data;
+
+  const [collection, dreamsCollection, inboxCollection] = await Promise.all([
+    getStarsCollection(),
+    getDreamsCollection(),
+    getInboxCollection(),
+  ]);
+
+  const star = await getStar(session.user.email, dreamId);
+
+  return await Promise.all([
+    collection.deleteOne({
+      userEmail: session.user.email,
+      dreamId: ObjectID(dreamId),
+    }),
+    dreamsCollection.updateOne(
+      {
+        _id: ObjectID(dreamId),
+      },
+      { $inc: { starCount: -1 } }
+    ),
+    inboxCollection.deleteOne({
+      userEmail: session.user.email,
+      starKey: star?.inboxKey,
+    }),
+  ]);
+}
+
+/**
+ * @todo document this
+ */
+export async function markSomeInboxMessagesAsRead(inboxIds) {
+  const collection = await getInboxCollection();
+
+  const bulk = collection.initializeOrderedBulkOp();
+
+  inboxIds.forEach((id) => {
+    bulk.find({ _id: ObjectID(id) }).update({
+      $set: {
+        read: true,
+        lastUpdatedAt: new Date().toISOString(),
+      },
+    });
+  });
+
+  const result = await bulk.execute();
+
+  return result;
+}
+
+/**
+ * @todo document this
+ */
+export async function markAllInboxMessagesAsRead(userEmail) {
+  const collection = await getInboxCollection();
+
+  const result = await collection.updateMany(
+    {
+      dreamOwnerUserEmail: userEmail,
+    },
+    {
+      $set: {
+        read: true,
+        lastUpdatedAt: new Date().toISOString(),
+      },
+    }
+  );
+
+  return result;
+}
+
+/**
+ * @todo document this
+ */
+export async function deleteAllInboxMessages(userEmail) {
+  const collection = await getInboxCollection();
+
+  const result = await collection.deleteMany({
+    dreamOwnerUserEmail: userEmail,
+  });
+
+  return result;
+}
+
+/**
+ * @todo document this
+ */
+export async function deleteSomeInboxMessages(inboxIds) {
+  const collection = await getInboxCollection();
+
+  const bulk = collection.initializeOrderedBulkOp();
+
+  inboxIds.forEach((id) => {
+    bulk.find({ _id: ObjectID(id) }).delete();
+  });
+
+  const result = await bulk.execute();
+
+  return result;
+}
+
+/**
+ * Saves a completion to the database
+ *
+ * @param {*} completion
+ * @param {*} dreamId
+ * @param {*} userEmail
+ * @param {*} userId
+ */
+export async function saveCompletion(completion, dreamId, userEmail, userId) {
+  const collection = await getCompletionsCollection();
+
+  // This should never happen as the client route (triggered first time a completion
+  // is generated) always provides the userEmail from the session.
+  // In the meanwhile, backend routes (triggered from Chiron or from upateDream), always provides the userId.
+
+  // Backend routes
+  if (!userEmail &amp;&amp; !userId) {
+    throw new Error("No user data provided");
+  }
+
+  let user = {};
+
+  // Client route; first completion
+  if (userEmail &amp;&amp; !userId) {
+    user = await getUserByEmail(userEmail);
+  }
+
+  const data = {
+    userId: ObjectID(userId ? userId : userEmail &amp;&amp; user ? user._id : userId),
+    dreamId: ObjectID(dreamId),
+    completion,
+    pendingReview: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const result = await collection.insertOne(data);
+
+  return { result, data };
+}
+
+/**
+ * Starts the completion generation process, which is followed by a
+ * human-in-the-loop review process until it gets back to this
+ * service
+ *
+ * session and userId params are optional because this method
+ * has two possible workflows, one using the session and the other
+ * using the userIds. The session workflow starts on the frontend,
+ * while the userId workflow starts on the backend.
+ *
+ * This is this way because saveCompletions method is, and this method
+ * calls it.
+ *
+ * @param {string} dreamId The dream id
+ * @param {string} text The dream data text
+ * @param {object} session (Optional) The session object. If not provided, the `userId` must be provided.
+ * @param {string} userId (Optional) The user id. If not provided, the `session` must be provided.
+ */
+export async function generateCompletion(dreamId, text, session, userId) {
+  const params = {
+    messages: [
+      { role: "system", content: systemInstruction },
+      { role: "user", content: text },
+    ],
+    model: "gpt-3.5-turbo",
+  };
+
+  const completion = await openai.chat.completions.create(params);
+
+  const { result, data } = await saveCompletion(
+    completion,
+    dreamId,
+    session?.user?.email,
+    userId
+  );
+
+  if (result?.acknowledged || result?.insertedId) {
+    await hitChiron(data);
+  }
+}
+
+const systemInstruction = `Act as a psychotherapist specializing in dream interpretation with a deep knowledge of archetypes and mythology. 
+  When presented with a dream narrative, provide insightful analysis and open-ended questions to help the dreamer gain a deeper understanding of their dream.
+  Do not provide personal opinions or assumptions about the dreamer. 
+  Provide only factual interpretations based on the information given. 
+  Keep your answer short and concise, with 5000 characters at most.
+  If the dream looks incomplete, never complete it.
+  Always respond in the language in which the dream narrative is presented, even if it differs from the initial instruction language (English).`;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#completionsReviewHandler">completionsReviewHandler</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateCompletion">generateCompletion</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getDreamById">getDreamById</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnDream">hasAiCommentedOnDream</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#saveCompletion">saveCompletion</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Mon Dec 18 2023 02:25:08 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

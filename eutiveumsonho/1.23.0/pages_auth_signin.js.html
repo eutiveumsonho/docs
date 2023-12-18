@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/auth/signin.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/auth/signin.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module pages/api/auth/signin */
+import {
+  Box,
+  Button,
+  Card,
+  FormField,
+  Layer,
+  Spinner,
+  TextInput,
+} from "grommet";
+import { Facebook, Google } from "grommet-icons";
+import {
+  getCsrfToken,
+  getProviders,
+  getSession,
+  signIn,
+} from "next-auth/react";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import { Fragment, useEffect, useState } from "react";
+import isEmail from "validator/lib/isEmail";
+import Clouds from "../../components/clouds";
+import { Logo } from "../../components/logo";
+import { NEXT_AUTH_ERRORS } from "../../lib/errors";
+import { getUserAgentProps } from "../../lib/user-agent";
+import { useTranslation } from "next-i18next";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+
+const icon = {
+  Facebook: &lt;Facebook />,
+  Google: &lt;Google />,
+};
+
+/**
+ * Sign in page. This page shows the user a sign in form.
+ * The user can sign in with their email or with a third-party provider.
+ * The user can also sign up seamlessly on this page.
+ *
+ * @param {{ providers, csrfToken }} props - The props this component gets from getServerSideProps
+ */
+export default function SignIn({ providers, csrfToken }) {
+  const [emailSignInLoading, setEmailSignInLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const { query, locale, push } = useRouter();
+  const { t } = useTranslation("signin");
+  const [error, setError] = useState(null);
+
+  const errorQs = query["error"];
+
+  useEffect(() => {
+    const localeQs = query["locale"];
+
+    if (!localeQs) {
+      window.location.href += `&amp;locale=${locale}`;
+    }
+
+    if (errorQs) {
+      setError(errorQs);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      setEmailSignInLoading(false);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (error) {
+      setError(null);
+    }
+  }, [email]);
+
+  const handleOnSubmit = async (event) => {
+    event.preventDefault();
+    setEmailSignInLoading(true);
+    const callbackUrl = `${window.location.origin}/${locale}/auth/verify-request`;
+
+    const { error, ok } = await signIn("email", {
+      email,
+      redirect: false,
+    });
+
+    if (ok &amp;&amp; !error) {
+      push(callbackUrl);
+    }
+
+    if (error) {
+      setError(error);
+    }
+  };
+
+  return (
+    &lt;>
+      &lt;Head>
+        &lt;title>{t("enter")}&lt;/title>
+      &lt;/Head>
+      {error ? (
+        &lt;Layer position="top" modal={false}>
+          &lt;Box
+            gap="medium"
+            pad="medium"
+            width={"100vw"}
+            align="center"
+            background="status-critical"
+          >
+            {NEXT_AUTH_ERRORS[error][locale]
+              ? NEXT_AUTH_ERRORS[error][locale]
+              : NEXT_AUTH_ERRORS.Default[locale]}
+          &lt;/Box>
+        &lt;/Layer>
+      ) : null}
+      &lt;Clouds />
+      &lt;Box
+        pad="large"
+        align="center"
+        gap="medium"
+        width="large"
+        justify="center"
+        style={{
+          display: "flex",
+          height: "90vh",
+          margin: "auto",
+        }}
+      >
+        &lt;Card
+          pad="large"
+          gap="medium"
+          align="center"
+          background="white"
+          style={{
+            minWidth: "24rem",
+          }}
+        >
+          &lt;Logo />
+
+          {Object.values(providers).map((provider) => {
+            if (provider.type === "email") {
+              return (
+                &lt;Fragment key={provider.type}>
+                  {/* https://next-auth.js.org/configuration/pages#email-sign-in */}
+                  &lt;form onSubmit={handleOnSubmit}>
+                    &lt;input
+                      name="csrfToken"
+                      type="hidden"
+                      defaultValue={csrfToken}
+                    />
+                    &lt;FormField
+                      required
+                      name="email"
+                      validate={[
+                        (value) => {
+                          if (!isEmail(value ?? "")) {
+                            return {
+                              message: t("valid-email"),
+                            };
+                          }
+                        },
+                      ]}
+                    >
+                      &lt;TextInput
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder={t("email")}
+                        onChange={(event) => {
+                          setEmail(event.target.value);
+                        }}
+                      />
+                    &lt;/FormField>
+                    &lt;Button
+                      style={{
+                        minWidth: "18.75rem",
+                      }}
+                      icon={
+                        emailSignInLoading ? &lt;Spinner size="xsmall" /> : null
+                      }
+                      label={emailSignInLoading ? t("sending") : t("send")}
+                      type="submit"
+                      fill="horizontal"
+                      primary
+                      onClick={() => setEmailSignInLoading(true)}
+                    />
+                  &lt;/form>
+                  &lt;hr />
+                &lt;/Fragment>
+              );
+            }
+
+            if (
+              process.env.NODE_ENV === "production" ||
+              process.env.NODE_ENV === "test"
+            ) {
+              return (
+                &lt;Button
+                  key={provider.name}
+                  style={{
+                    width: "100%",
+                  }}
+                  onClick={() => {
+                    if (process.env.NODE_ENV === "test") {
+                      console.warn(
+                        "Test mode, skipping OAuth flow. Use magic links."
+                      );
+                      return;
+                    }
+
+                    signIn(provider.id, {
+                      callbackUrl: `${window.location.origin}/${locale}/dreams`,
+                    });
+                  }}
+                  icon={icon[provider.name]}
+                  label={`${t("enter-with")} ${provider.name}`}
+                  primary
+                />
+              );
+            }
+
+            return null;
+          })}
+        &lt;/Card>
+      &lt;/Box>
+    &lt;/>
+  );
+}
+
+export async function getServerSideProps(context) {
+  const providers = await getProviders();
+  const session = await getSession(context);
+
+  if (session) {
+    context.res.writeHead(302, { Location: `/${context.locale}` });
+    context.res.end();
+
+    return {
+      props: {
+        ...getUserAgentProps(context),
+        ...(await serverSideTranslations(context.locale, ["signin", "common"])),
+      },
+    };
+  }
+
+  return {
+    props: {
+      providers,
+      csrfToken: await getCsrfToken(context),
+      ...getUserAgentProps(context),
+      ...(await serverSideTranslations(context.locale, ["signin", "common"])),
+    },
+  };
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#completionsReviewHandler">completionsReviewHandler</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateCompletion">generateCompletion</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getDreamById">getDreamById</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnDream">hasAiCommentedOnDream</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#saveCompletion">saveCompletion</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Mon Dec 18 2023 02:25:08 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
