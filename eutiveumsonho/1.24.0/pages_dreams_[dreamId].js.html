@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/dreams/[dreamId].js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/dreams/[dreamId].js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module pages/dreams/:dreamId */
+import Head from "next/head";
+import Dream from "../../containers/dream";
+import { getAuthProps } from "../../lib/auth";
+import { truncate } from "../../lib/strings";
+import {
+  getDreamById,
+  getUserByEmail,
+  getUserById,
+  getComments,
+} from "../../lib/db/reads";
+import { getUserAgentProps } from "../../lib/user-agent";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+
+/**
+ * Dream page. This page shows a user's dream.
+ *
+ * @param {{ data, comments, serverSession }} props - The props this component gets from getServerSideProps
+ */
+export default function DreamPage(props) {
+  const { data: rawData, comments: rawComments, ...authProps } = props;
+
+  const data = JSON.parse(rawData);
+  const comments = JSON.parse(rawComments);
+
+  return (
+    &lt;>
+      &lt;Head>
+        &lt;title>{truncate(data.dream.text, 50, true)}&lt;/title>
+      &lt;/Head>
+      &lt;Dream data={data} comments={comments} {...authProps} />
+    &lt;/>
+  );
+}
+
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
+  const { res } = context;
+
+  try {
+    const { dreamId } = context.params;
+
+    if (!authProps.props.serverSession) {
+      const data = await getDreamById(dreamId);
+
+      if (data.visibility === "private") {
+        res.setHeader("location", `/${context.locale}`);
+        res.statusCode = 302;
+        res.end();
+
+        return { props: {} };
+      }
+
+      const user = await getUserById(data.userId);
+      data.user = user;
+
+      const comments = await getComments(dreamId);
+
+      return {
+        props: {
+          ...authProps.props,
+          data: JSON.stringify(data),
+          comments: JSON.stringify(comments),
+          ...getUserAgentProps(context),
+          ...(await serverSideTranslations(context.locale, [
+            "layout",
+            "footer",
+            "common",
+          ])),
+        },
+      };
+    }
+
+    let [data, user] = await Promise.all([
+      getDreamById(dreamId),
+      getUserByEmail(authProps.props.serverSession.user.email),
+    ]);
+
+    const isDreamOwner = user._id.toString() === data.userId.toString();
+
+    if (data.visibility === "private" &amp;&amp; !isDreamOwner) {
+      res.setHeader("location", `/${context.locale}/dreams`);
+      res.statusCode = 302;
+      res.end();
+
+      return {
+        props: {
+          ...getUserAgentProps(context),
+          ...(await serverSideTranslations(context.locale, [
+            "dashboard",
+            "common",
+          ])),
+        },
+      };
+    }
+
+    if (data.visibility === "anonymous") {
+      delete data.userId;
+    } else {
+      if (isDreamOwner) {
+        data.user = user;
+      } else {
+        const user = await getUserById(data.userId);
+        data.user = user;
+      }
+    }
+
+    const comments = await getComments(dreamId);
+
+    return {
+      props: {
+        ...authProps.props,
+        data: JSON.stringify(data),
+        comments: JSON.stringify(comments),
+        ...getUserAgentProps(context),
+        ...(await serverSideTranslations(context.locale, [
+          "dashboard",
+          "common",
+        ])),
+      },
+    };
+  } catch (error) {
+    console.error({
+      error,
+      service: "web",
+      pathname: "/sonhos/[dreamId]",
+      component: "DreamPage",
+    });
+  }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#completionsReviewHandler">completionsReviewHandler</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createDream">createDream</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deleteDream">deleteDream</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#generateCompletion">generateCompletion</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getCommentById">getCommentById</a></li><li><a href="global.html#getDreamById">getDreamById</a></li><li><a href="global.html#getInbox">getInbox</a></li><li><a href="global.html#getInboxCount">getInboxCount</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getStar">getStar</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnDream">hasAiCommentedOnDream</a></li><li><a href="global.html#hasCommentedOnDream">hasCommentedOnDream</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#saveCompletion">saveCompletion</a></li><li><a href="global.html#starDream">starDream</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#unstarDream">unstarDream</a></li><li><a href="global.html#updateDream">updateDream</a></li><li><a href="global.html#updateDreamVisibility">updateDreamVisibility</a></li><li><a href="global.html#updateUser">updateUser</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Sun Dec 24 2023 21:54:30 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
