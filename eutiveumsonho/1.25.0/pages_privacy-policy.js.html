@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/privacy-policy.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/privacy-policy.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { PageContent } from "grommet";
+import Head from "next/head";
+import Layout from "../components/layout";
+import { getAuthProps } from "../lib/auth";
+import { getUserAgentProps } from "../lib/user-agent";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+import { useTranslation } from "next-i18next";
+import { useRouter } from "next/router";
+
+/**
+ * This component represents the page for the privacy policy.
+ * On this page, users can read the privacy policy rendered from iubenda.
+ *
+ * @param {{ serversSession, deviceType }} props - The props this component gets from getServerSideProps
+ */
+export default function PrivacyPolicy(props) {
+  const { serverSession: rawServerSession, deviceType } = props;
+  const { t } = useTranslation("footer");
+  const { locale } = useRouter();
+
+  const serverSession = JSON.parse(rawServerSession);
+
+  const privacyPolicies = {
+    en: '&lt;a href="https://www.iubenda.com/privacy-policy/70195735" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iubenda-noiframe iub-body-embed" title="Privacy Policy">Privacy Policy&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+    pt: '&lt;a href="https://www.iubenda.com/privacy-policy/26392272" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iub-no-markup iubenda-noiframe iub-body-embed" title="Política de Privacidade">Política de Privacidade&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+    undefined:
+      '&lt;a href="https://www.iubenda.com/privacy-policy/26392272" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iub-no-markup iubenda-noiframe iub-body-embed" title="Política de Privacidade">Política de Privacidade&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+    es: '&lt;a href="https://www.iubenda.com/privacy-policy/63047876" class="iubenda-nostyle no-brand iubenda-noiframe iubenda-embed iubenda-noiframe iub-body-embed" title="Política de Privacidad">Política de Privacidad&lt;/a>&lt;script type="text/javascript">(function (w,d) {var loader = function () {var s = d.createElement("script"), tag = d.getElementsByTagName("script")[0]; s.src="https://cdn.iubenda.com/iubenda.js"; tag.parentNode.insertBefore(s,tag);}; if(w.addEventListener){w.addEventListener("load", loader, false);}else if(w.attachEvent){w.attachEvent("onload", loader);}else{w.onload = loader;}})(window, document);&lt;/script>',
+  };
+
+  return (
+    &lt;Layout serverSession={serverSession} deviceType={deviceType}>
+      &lt;Head>
+        &lt;title>{t("privacy")}&lt;/title>
+        &lt;meta name="description" content={t("privacy")} />
+        &lt;link rel="icon" href="/favicon.ico" />
+      &lt;/Head>
+      &lt;PageContent
+        justify="center"
+        align="center"
+        flex
+        style={{
+          minHeight: "100vh",
+        }}
+      >
+        &lt;div
+          dangerouslySetInnerHTML={{
+            __html: privacyPolicies[locale]
+              ? privacyPolicies[locale]
+              : privacyPolicies["en"],
+          }}
+        />
+      &lt;/PageContent>
+    &lt;/Layout>
+  );
+}
+
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
+
+  if (authProps.props.serverSession) {
+    return {
+      props: {
+        ...getUserAgentProps(context),
+        ...(await serverSideTranslations(context.locale, [
+          "footer",
+          "layout",
+          "common",
+        ])),
+      },
+    };
+  }
+
+  return {
+    props: {
+      serverSession: JSON.stringify(authProps.props.serverSession),
+      ...getUserAgentProps(context),
+      ...(await serverSideTranslations(context.locale, [
+        "footer",
+        "layout",
+        "common",
+      ])),
+    },
+  };
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-api_data_completions-review.html">api/data/completions-review</a></li><li><a href="module-lib_data-analysis.html">lib/data-analysis</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-lib_mongodb.html">lib/mongodb</a></li><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getCommentById">getCommentById</a></li><li><a href="global.html#getDreamById">getDreamById</a></li><li><a href="global.html#getInbox">getInbox</a></li><li><a href="global.html#getInboxCount">getInboxCount</a></li><li><a href="global.html#getLatestPublicDreams">getLatestPublicDreams</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getStar">getStar</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#hasAiCommentedOnDream">hasAiCommentedOnDream</a></li><li><a href="global.html#hasCommentedOnDream">hasCommentedOnDream</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#updateUser">updateUser</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.2</a> on Mon Dec 25 2023 15:19:37 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
