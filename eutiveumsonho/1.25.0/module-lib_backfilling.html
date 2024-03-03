@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/auth/verify-request.js</title>
+    <title>JSDoc: Module: lib/backfilling</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,99 +17,179 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/auth/verify-request.js</h1>
+    <h1 class="page-title">Module: lib/backfilling</h1>
 
     
 
 
 
+
+<section>
+
+<header>
     
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>/** @module pages/api/auth/verify-request */
-import { Box, Button, Card, Heading, Text } from "grommet";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import Clouds from "../../components/clouds";
-import { Logo } from "../../components/logo";
-import { useTranslation } from "next-i18next";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+</header>
 
-export default function VerifyRequest() {
-  const { push, locale } = useRouter();
-  const { t } = useTranslation("verify-request");
+<article>
+    <div class="container-overview">
+    
+        
 
-  return (
-    &lt;>
-      &lt;Head>
-        &lt;title>{t("verify-email")}&lt;/title>
-      &lt;/Head>
-      &lt;Clouds />
-      &lt;Box
-        pad="large"
-        align="center"
-        gap="medium"
-        width="large"
-        justify="center"
-        style={{
-          display: "flex",
-          height: "90vh",
-          margin: "auto",
-        }}
-      >
-        &lt;Card
-          pad="large"
-          gap="medium"
-          align="center"
-          background="white"
-          style={{
-            minWidth: "24rem",
-          }}
-        >
-          &lt;Logo />
-          &lt;Heading
-            level={2}
-            style={{
-              marginBottom: 0,
-            }}
-          >
-            {t("check-email")}
-          &lt;/Heading>
-          &lt;Text
-            style={{
-              marginBottom: "1.5rem",
-            }}
-          >
-            {t("sent")} 😉.
-          &lt;/Text>
-          &lt;Button
-            key={"back-to-site"}
-            style={{
-              width: "100%",
-            }}
-            onClick={() => push(`/${locale}`)}
-            label={t("back")}
-            primary
-          />
-        &lt;/Card>
-      &lt;/Box>
-    &lt;/>
-  );
-}
+        
 
-export async function getServerSideProps(context) {
-  return {
-    props: {
-      ...(await serverSideTranslations(context.locale, [
-        "verify-request",
-        "common",
-      ])),
-    },
-  };
-}
-</code></pre>
-        </article>
-    </section>
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_backfilling.js.html">lib/backfilling.js</a>, <a href="lib_backfilling.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id="~EXECUTED"><span class="type-signature">(inner) </span>EXECUTED<span class="type-signature"></span></h4>
+
+
+<p class="summary"><p>Some new features may include data generation,
+and this data naturally won't not be available for old users,
+unless we force it.</p></p>
+
+
+
+<div class="description">
+    <p>Some new features may include data generation,
+and this data naturally won't not be available for old users,
+unless we force it.</p>
+<p>This module is responsible for that: it will be executed
+on every deployment that has the NEXT_MANUAL_SIG_HANDLE
+environment variable set to 1 or true, so that we can manually
+trigger it and make sure that every user within the
+platform has its data consistent.</p>
+<p>This is not necessarily the best way to do this, but it's
+the best we can do for now.</p>
+<p>Before shipping this code to production we always test it
+on the development environment.</p>
+<p>It was used:</p>
+<ul>
+<li>Generate word frequency from each dream</li>
+</ul>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_backfilling.js.html">lib/backfilling.js</a>, <a href="lib_backfilling.js.html#line26">line 26</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
 
 
 

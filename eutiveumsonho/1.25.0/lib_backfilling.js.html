@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/auth/verify-request.js</title>
+    <title>JSDoc: Source: lib/backfilling.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/auth/verify-request.js</h1>
+    <h1 class="page-title">Source: lib/backfilling.js</h1>
 
     
 
@@ -26,86 +26,41 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>/** @module pages/api/auth/verify-request */
-import { Box, Button, Card, Heading, Text } from "grommet";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import Clouds from "../../components/clouds";
-import { Logo } from "../../components/logo";
-import { useTranslation } from "next-i18next";
-import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+            <pre class="prettyprint source linenums"><code>/** @module lib/backfilling */
 
-export default function VerifyRequest() {
-  const { push, locale } = useRouter();
-  const { t } = useTranslation("verify-request");
+/**
+ * Some new features may include data generation,
+ * and this data naturally won't not be available for old users,
+ * unless we force it.
+ *
+ * This module is responsible for that: it will be executed
+ * on every deployment that has the NEXT_MANUAL_SIG_HANDLE
+ * environment variable set to 1 or true, so that we can manually
+ * trigger it and make sure that every user within the
+ * platform has its data consistent.
+ *
+ * This is not necessarily the best way to do this, but it's
+ * the best we can do for now.
+ *
+ * Before shipping this code to production we always test it
+ * on the development environment.
+ *
+ * It was used:
+ * - Generate word frequency from each dream
+ *
+ * @link https://nextjs.org/docs/deployment#manual-graceful-shutdowns
+ */
 
-  return (
-    &lt;>
-      &lt;Head>
-        &lt;title>{t("verify-email")}&lt;/title>
-      &lt;/Head>
-      &lt;Clouds />
-      &lt;Box
-        pad="large"
-        align="center"
-        gap="medium"
-        width="large"
-        justify="center"
-        style={{
-          display: "flex",
-          height: "90vh",
-          margin: "auto",
-        }}
-      >
-        &lt;Card
-          pad="large"
-          gap="medium"
-          align="center"
-          background="white"
-          style={{
-            minWidth: "24rem",
-          }}
-        >
-          &lt;Logo />
-          &lt;Heading
-            level={2}
-            style={{
-              marginBottom: 0,
-            }}
-          >
-            {t("check-email")}
-          &lt;/Heading>
-          &lt;Text
-            style={{
-              marginBottom: "1.5rem",
-            }}
-          >
-            {t("sent")} 😉.
-          &lt;/Text>
-          &lt;Button
-            key={"back-to-site"}
-            style={{
-              width: "100%",
-            }}
-            onClick={() => push(`/${locale}`)}
-            label={t("back")}
-            primary
-          />
-        &lt;/Card>
-      &lt;/Box>
-    &lt;/>
-  );
-}
+let EXECUTED = false;
 
-export async function getServerSideProps(context) {
-  return {
-    props: {
-      ...(await serverSideTranslations(context.locale, [
-        "verify-request",
-        "common",
-      ])),
-    },
-  };
+if (process.env.NEXT_MANUAL_SIG_HANDLE) {
+  console.log("MANUAL SIG HANDLE IS ON");
+
+  if (!EXECUTED) {
+    // Backfilling here
+
+    EXECUTED = true;
+  }
 }
 </code></pre>
         </article>
