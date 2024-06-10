@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: lib/api/users.js</title>
+    <title>JSDoc: Source: lib/legal/privacy-policy/index.jsx</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: lib/api/users.js</h1>
+    <h1 class="page-title">Source: lib/legal/privacy-policy/index.jsx</h1>
 
     
 
@@ -26,34 +26,25 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>/**
- * Updates the user's data.
- *
- * @param {object} data
- * @returns {Promise&lt;boolean>}
+            <pre class="prettyprint source linenums"><code>import { useRouter } from "next/router";
+import { PrivacyPolicyEn } from "./en";
+import { PrivacyPolicyPt } from "./pt";
+import { PrivacyPolicyEs } from "./es";
+
+/**
+ * TODO: Evaluate if it's best to break these components into
+ * JSONs so we can have a single components pointing to the translations.
  */
-export async function updateUser(data) {
-  const response = await fetch("/api/account", {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
+const privacyPolicyMap = {
+  en: &lt;PrivacyPolicyEn />,
+  pt: &lt;PrivacyPolicyPt />,
+  es: &lt;PrivacyPolicyEs />,
+};
 
-  if (response.ok) {
-    return true;
-  }
+export function PrivacyPolicy() {
+  const { locale } = useRouter();
 
-  console.error({
-    error: await response.text(),
-    response,
-    service: "web",
-    pathname: "/api/account",
-    component: "updateUser",
-  });
-
-  return false;
+  return privacyPolicyMap[locale] ?? &lt;PrivacyPolicyEn />;
 }
 </code></pre>
         </article>
