@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/api/data/completions-review.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/api/data/completions-review.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module api/data/completions-review */
+import { getPostById, hasAiCommentedOnPost } from "../../../lib/db/reads";
+import { createAIComment, generateCompletion } from "../../../lib/db/writes";
+import {
+  BAD_REQUEST,
+  METHOD_NOT_ALLOWED,
+  SERVER_ERROR,
+} from "../../../lib/errors";
+import { logError } from "../../../lib/o11y/log";
+
+/**
+ * This endpoint is hit by Chiron after a review is completed.
+ * To learn more about Chiron, visit:
+ * @link https://github.com/eutiveumsonho/chiron
+ */
+function completionsReviewHandler(req, res) {
+  switch (req.method) {
+    case "POST":
+      return post(req, res);
+    default:
+      res.setHeader("Allow", ["POST"]);
+      res.status(405).end(METHOD_NOT_ALLOWED);
+      return res;
+  }
+}
+
+/**
+ * @private
+ */
+async function post(req, res) {
+  if (!req.body?.completion || !req.body?.dreamId) {
+    res.status(400).end(BAD_REQUEST);
+    return res;
+  }
+
+  const hasCommented = await hasAiCommentedOnPost(req.body.dreamId);
+
+  if (hasCommented) {
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send("OK");
+    return res;
+  }
+
+  const { completion, dreamId } = req.body;
+
+  if (req.body?.skip) {
+    console.log("Skipping completion review");
+    res.setHeader("Content-Type", "application/json");
+    res.status(202).send("Accepted");
+    return res;
+  }
+
+  try {
+    // The "approved" property is always set by a human to `true` through Chiron,
+    // while "pendingReview" is set to `false`, also by a human.
+    // See https://github.com/eutiveumsonho/internal-docs for more details about
+    // this workflow.
+    if (!req.body.pendingReview &amp;&amp; !req.body.approved) {
+      const dreamData = await getPostById(dreamId);
+
+      console.log("Generating completion from workflow #2");
+      await generateCompletion(
+        dreamId,
+        dreamData.dream.text,
+        undefined,
+        dreamData.userId
+      );
+
+      res.setHeader("Content-Type", "application/json");
+      res.status(202).send("Accepted");
+
+      return res;
+    }
+
+    // TODO: Update the reviewed completion
+
+    // Once the completion is approved, we can generate a comment.
+    await createAIComment(completion.choices[0].message.content, dreamId);
+
+    res.setHeader("Content-Type", "application/json");
+    res.status(201).send("Created");
+
+    return res;
+  } catch (error) {
+    logError(error, {
+      service: "api",
+      pathname: "/api/data/completions-review",
+      method: "post",
+    });
+    res.status(500).end(SERVER_ERROR);
+
+    return res;
+  }
+}
+
+export default completionsReviewHandler;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-api_data_completions-review.html">api/data/completions-review</a></li><li><a href="module-lib_backfilling.html">lib/backfilling</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#connectToDatabase">connectToDatabase</a></li><li><a href="global.html#cookiePolicyMap">cookiePolicyMap</a></li><li><a href="global.html#cosineSimilarity">cosineSimilarity</a></li><li><a href="global.html#cosineSimilarityScore">cosineSimilarityScore</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createPost">createPost</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deletePost">deletePost</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#dotProduct">dotProduct</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getCommentById">getCommentById</a></li><li><a href="global.html#getComments">getComments</a></li><li><a href="global.html#getCommentsByUserId">getCommentsByUserId</a></li><li><a href="global.html#getCommentsCollection">getCommentsCollection</a></li><li><a href="global.html#getCompletionsCollection">getCompletionsCollection</a></li><li><a href="global.html#getCosineSimilarityCollection">getCosineSimilarityCollection</a></li><li><a href="global.html#getInbox">getInbox</a></li><li><a href="global.html#getInboxCollection">getInboxCollection</a></li><li><a href="global.html#getInboxCount">getInboxCount</a></li><li><a href="global.html#getLatestPublicPosts">getLatestPublicPosts</a></li><li><a href="global.html#getMongoClient">getMongoClient</a></li><li><a href="global.html#getPostById">getPostById</a></li><li><a href="global.html#getPosts">getPosts</a></li><li><a href="global.html#getPostsCollection">getPostsCollection</a></li><li><a href="global.html#getPostsInsights">getPostsInsights</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getStar">getStar</a></li><li><a href="global.html#getStarredPosts">getStarredPosts</a></li><li><a href="global.html#getStarsByUserEmail">getStarsByUserEmail</a></li><li><a href="global.html#getStarsCollection">getStarsCollection</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnPost">hasAiCommentedOnPost</a></li><li><a href="global.html#hasCommentedOnPost">hasCommentedOnPost</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#magnitude">magnitude</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#privacyPolicyMap">privacyPolicyMap</a></li><li><a href="global.html#searchPosts">searchPosts</a></li><li><a href="global.html#starPost">starPost</a></li><li><a href="global.html#termsAndConditionsMap">termsAndConditionsMap</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#textToFreqMap">textToFreqMap</a></li><li><a href="global.html#unstarPost">unstarPost</a></li><li><a href="global.html#updatePost">updatePost</a></li><li><a href="global.html#updatePostVisibility">updatePostVisibility</a></li><li><a href="global.html#updateUser">updateUser</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sun Oct 27 2024 08:34:24 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
