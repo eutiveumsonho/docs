@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Module: lib/db/writes</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Module: lib/db/writes</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id="~systemInstruction"><span class="type-signature">(inner, constant) </span>systemInstruction<span class="type-signature"></span></h4>
+
+
+<p class="summary">Some prompt instructions for the AI to generate completions.</p>
+
+
+
+<div class="description">
+    <p>Some prompt instructions for the AI to generate completions.</p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_db_writes.js.html">lib/db/writes.js</a>, <a href="lib_db_writes.js.html#line158">line 158</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createAIComment"><span class="type-signature">(static) </span>createAIComment<span class="signature">(comment, postId)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Generates a comment from a completion, created by an AI.</p>
+    
+
+
+
+<div class="description">
+    <p>Generates a comment from a completion, created by an AI.
+It uses the createComment method to create the comment.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>comment</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>postId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_db_writes.js.html">lib/db/writes.js</a>, <a href="lib_db_writes.js.html#line30">line 30</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+    <dt class="tag-todo">To Do:</dt>
+    <dd class="tag-todo">
+        <ul>
+            <li>move AI logic from createComment to this method</li>
+        </ul>
+    </dd>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".generateCompletion"><span class="type-signature">(static) </span>generateCompletion<span class="signature">(postId, text, session, userId)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary"><p>Starts the completion generation process, which is followed by a
+human-in-the-loop review process until it gets back to this
+service</p>
+<p>session and userId params are optional because this method
+has two possible workflows, one using the session and the other
+using the userIds.</p></p>
+    
+
+
+
+<div class="description">
+    <p>Starts the completion generation process, which is followed by a
+human-in-the-loop review process until it gets back to this
+service</p>
+<p>session and userId params are optional because this method
+has two possible workflows, one using the session and the other
+using the userIds. The session workflow starts on the frontend,
+while the userId workflow starts on the backend.</p>
+<p>This is this way because saveCompletions method is, and this method
+calls it.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>postId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The dream id</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>text</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The dream data text</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>session</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>(Optional) The session object. If not provided, the <code>userId</code> must be provided.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>(Optional) The user id. If not provided, the <code>session</code> must be provided.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_db_writes.js.html">lib/db/writes.js</a>, <a href="lib_db_writes.js.html#line106">line 106</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".saveCompletion"><span class="type-signature">(static) </span>saveCompletion<span class="signature">(completion, postId, userEmail, userId)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary"><p>Saves a completion to the database</p>.</p>
+    
+
+
+
+<div class="description">
+    <p>Saves a completion to the database</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>completion</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>postId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>userEmail</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_db_writes.js.html">lib/db/writes.js</a>, <a href="lib_db_writes.js.html#line55">line 55</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".saveCosineSimilarityScore"><span class="type-signature">(static) </span>saveCosineSimilarityScore<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Saves the cosine similarity score between two texts.</p>
+    
+
+
+
+<div class="description">
+    <p>Saves the cosine similarity score between two texts.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="lib_db_writes.js.html">lib/db/writes.js</a>, <a href="lib_db_writes.js.html#line169">line 169</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-api_data_completions-review.html">api/data/completions-review</a></li><li><a href="module-lib_backfilling.html">lib/backfilling</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#connectToDatabase">connectToDatabase</a></li><li><a href="global.html#cookiePolicyMap">cookiePolicyMap</a></li><li><a href="global.html#cosineSimilarity">cosineSimilarity</a></li><li><a href="global.html#cosineSimilarityScore">cosineSimilarityScore</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createPost">createPost</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deletePost">deletePost</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#dotProduct">dotProduct</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getCommentById">getCommentById</a></li><li><a href="global.html#getComments">getComments</a></li><li><a href="global.html#getCommentsByUserId">getCommentsByUserId</a></li><li><a href="global.html#getCommentsCollection">getCommentsCollection</a></li><li><a href="global.html#getCompletionsCollection">getCompletionsCollection</a></li><li><a href="global.html#getCosineSimilarityCollection">getCosineSimilarityCollection</a></li><li><a href="global.html#getInbox">getInbox</a></li><li><a href="global.html#getInboxCollection">getInboxCollection</a></li><li><a href="global.html#getInboxCount">getInboxCount</a></li><li><a href="global.html#getLatestPublicPosts">getLatestPublicPosts</a></li><li><a href="global.html#getMongoClient">getMongoClient</a></li><li><a href="global.html#getPostById">getPostById</a></li><li><a href="global.html#getPosts">getPosts</a></li><li><a href="global.html#getPostsCollection">getPostsCollection</a></li><li><a href="global.html#getPostsInsights">getPostsInsights</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getStar">getStar</a></li><li><a href="global.html#getStarredPosts">getStarredPosts</a></li><li><a href="global.html#getStarsByUserEmail">getStarsByUserEmail</a></li><li><a href="global.html#getStarsCollection">getStarsCollection</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnPost">hasAiCommentedOnPost</a></li><li><a href="global.html#hasCommentedOnPost">hasCommentedOnPost</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#magnitude">magnitude</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#privacyPolicyMap">privacyPolicyMap</a></li><li><a href="global.html#searchPosts">searchPosts</a></li><li><a href="global.html#starPost">starPost</a></li><li><a href="global.html#termsAndConditionsMap">termsAndConditionsMap</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#textToFreqMap">textToFreqMap</a></li><li><a href="global.html#unstarPost">unstarPost</a></li><li><a href="global.html#updatePost">updatePost</a></li><li><a href="global.html#updatePostVisibility">updatePostVisibility</a></li><li><a href="global.html#updateUser">updateUser</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Mar 29 2025 11:07:57 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

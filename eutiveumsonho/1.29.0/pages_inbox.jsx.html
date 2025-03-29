@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pages/inbox.jsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pages/inbox.jsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { getAuthProps } from "../lib/auth";
+import Head from "next/head";
+import Dashboard from "../components/dashboard";
+import { css } from "@emotion/css";
+import {
+  Anchor,
+  Avatar,
+  Box,
+  Button,
+  CheckBox,
+  DataTable,
+  Heading,
+} from "grommet";
+import Empty from "../components/empty";
+import { getInbox } from "../lib/db/reads";
+import { useState } from "react";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import LocalizedFormat from "dayjs/plugin/localizedFormat";
+import { Router, useRouter } from "next/router";
+import { Checkmark, StatusGoodSmall, Trash } from "grommet-icons";
+import { markInboxMessagesAsRead, deleteInboxMessages } from "../lib/api";
+import "dayjs/locale/pt-br";
+import { BRAND_HEX } from "../lib/config";
+import { getUserAgentProps } from "../lib/user-agent";
+import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+import { useTranslation } from "next-i18next";
+import "dayjs/locale/pt-br";
+import "dayjs/locale/en";
+import "dayjs/locale/es";
+import "dayjs/locale/fr";
+import { logError } from "../lib/o11y/log";
+
+dayjs.extend(LocalizedFormat);
+dayjs.extend(relativeTime);
+
+/**
+ * This component represents the page for the user's inbox.
+ * On this page, users can manage their inbox messages.
+ *
+ * @function
+ * @param {{ serversSession, data, deviceType }} props - The props this component gets from getServerSideProps
+ * @returns {JSX.Element}
+ */
+export default function Inbox(props) {
+  const { serverSession: rawServerSession, data: rawData, deviceType } = props;
+
+  const serverSession = JSON.parse(rawServerSession);
+  const data = JSON.parse(rawData);
+
+  const { push, locale } = useRouter();
+  const { t } = useTranslation("dashboard");
+  const [eagerData, setEagerData] = useState(data);
+  const [checked, setChecked] = useState([]);
+
+  const empty = {
+    description: `${t("no-comments")} 😉`,
+    label: t("discover-dreams"),
+    actionRoute: `/${locale}/dreams`,
+  };
+
+  const onCheck = (event, value) => {
+    if (event.target.checked) {
+      setChecked([...checked, value]);
+    } else {
+      setChecked(checked.filter((item) => item !== value));
+    }
+  };
+
+  const onCheckAll = (event) =>
+    setChecked(event.target.checked ? eagerData.map((inbox) => inbox._id) : []);
+
+  const onClick = (path, inboxId) => {
+    markInboxMessagesAsRead([inboxId]);
+    push(path);
+  };
+
+  const onMarkAsRead = async () => {
+    const markAllAsRead = eagerData.length === checked.length;
+    await markInboxMessagesAsRead(checked, markAllAsRead);
+
+    if (markAllAsRead) {
+      setEagerData(eagerData.map((inbox) => ({ ...inbox, read: true })));
+      setChecked([]);
+
+      return;
+    }
+
+    const updated = eagerData.map((inbox) => {
+      if (checked.includes(inbox._id)) {
+        return { ...inbox, read: true };
+      }
+
+      return inbox;
+    });
+
+    setEagerData(updated);
+    setChecked([]);
+  };
+
+  const onDelete = async () => {
+    const deleteAll = eagerData.length === checked.length;
+
+    try {
+      await deleteInboxMessages(checked, deleteAll);
+
+      if (deleteAll) {
+        setChecked([]);
+        setEagerData([]);
+
+        return;
+      }
+
+      const nonDeleted = eagerData
+        .map((inbox) => {
+          if (checked.find((id) => inbox._id === id)) {
+            return null;
+          }
+
+          return inbox;
+        })
+        .filter(Boolean);
+
+      setEagerData(nonDeleted);
+      setChecked([]);
+    } catch (error) {
+      logError(error, {
+        service: "web",
+        pathname: "/inbox",
+        component: "Inbox",
+      });
+    }
+  };
+
+  const columns = [
+    {
+      property: "read",
+      header: "",
+      pin: true,
+      render: (inbox) => {
+        return (
+          &lt;Box
+            direction="row"
+            justify="start"
+            align="center"
+            className={inbox.read ? "read" : "unread"}
+          >
+            {!inbox.read ? (
+              &lt;StatusGoodSmall
+                size="small"
+                style={{
+                  position: "absolute",
+                  left: "-1px",
+                }}
+              />
+            ) : null}
+            &lt;CheckBox
+              key={inbox._id}
+              checked={checked.indexOf(inbox._id) !== -1}
+              onChange={(e) => onCheck(e, inbox._id)}
+              pad={{
+                left: "small",
+              }}
+            />
+          &lt;/Box>
+        );
+      },
+      align: "start",
+      header: (
+        &lt;>
+          &lt;Box direction="row" fill gap="small" justify="start">
+            &lt;CheckBox
+              checked={checked.length === data.length}
+              indeterminate={checked.length > 0 &amp;&amp; checked.length &lt; data.length}
+              onChange={onCheckAll}
+              pad={{
+                left: "small",
+              }}
+            />
+            &lt;Button
+              hoverIndicator
+              icon={&lt;Checkmark size="small" />}
+              disabled={checked.length === 0}
+              onClick={onMarkAsRead}
+            />
+            &lt;Button
+              hoverIndicator
+              icon={&lt;Trash size="small" />}
+              disabled={checked.length === 0}
+              onClick={onDelete}
+            />
+          &lt;/Box>
+        &lt;/>
+      ),
+    },
+    {
+      property: "message",
+      align: "start",
+      size: "3/4",
+      render: (inbox) => {
+        const path = `/${locale}/dreams/${inbox.dreamId}${
+          inbox.type === "star" ? "" : "#comment"
+        }`;
+
+        const message = (
+          &lt;>
+            {inbox.userName ? inbox.userName : ""}{" "}
+            {inbox.type === "star"
+              ? t("saved-your-dream")
+              : t("commented-your-dream")}
+          &lt;/>
+        );
+
+        return (
+          &lt;Box direction="row" gap="medium" justify="start">
+            &lt;Avatar
+              src={inbox.userImage}
+              style={{
+                backgroundSize: "100%",
+              }}
+              size="small"
+            />
+            &lt;Anchor onClick={() => onClick(path, inbox._id)}>{message}&lt;/Anchor>
+          &lt;/Box>
+        );
+      },
+    },
+    {
+      property: "date",
+      header: "",
+      render: (inbox) => dayjs(inbox.createdAt).locale(locale).fromNow(),
+      align: "end",
+    },
+  ];
+
+  return (
+    &lt;>
+      &lt;Head>
+        &lt;title>{t("inbox")}&lt;/title>
+      &lt;/Head>
+      &lt;Dashboard serverSession={serverSession} deviceType={deviceType}>
+        &lt;Box pad="medium">
+          &lt;Heading size="small" level={1}>
+            {t("inbox")}
+          &lt;/Heading>
+          {eagerData.length === 0 ? &lt;Empty empty={empty} /> : null}
+          {eagerData.length > 0 ? (
+            &lt;Box
+              style={{
+                overflowX: "auto",
+              }}
+            >
+              &lt;Box
+                align="center"
+                style={{
+                  minWidth: "40rem",
+                }}
+              >
+                &lt;DataTable
+                  columns={columns}
+                  data={eagerData}
+                  size="medium"
+                  className={css`
+                    > tbody > tr {
+                      background-color: #ededed;
+
+                      a {
+                        color: #999999;
+                      }
+                    }
+
+                    > tbody > tr:has(div.unread) {
+                      background-color: white;
+
+                      a {
+                        color: ${BRAND_HEX};
+                      }
+                    }
+                  `}
+                />
+              &lt;/Box>
+            &lt;/Box>
+          ) : null}
+        &lt;/Box>
+      &lt;/Dashboard>
+    &lt;/>
+  );
+}
+
+export async function getServerSideProps(context) {
+  const authProps = await getAuthProps(context);
+
+  if (!authProps.props.serverSession || !authProps.props.serverSession?.user) {
+    const { res } = context;
+    res.setHeader("location", `/${context.locale}/auth/signin`);
+    res.statusCode = 302;
+    res.end();
+  }
+
+  const data = await getInbox(authProps.props.serverSession.user.email);
+
+  try {
+    return {
+      props: {
+        serverSession: JSON.stringify(authProps.props.serverSession),
+        data: JSON.stringify(data),
+        ...getUserAgentProps(context),
+        ...(await serverSideTranslations(context.locale, [
+          "dashboard",
+          "common",
+        ])),
+      },
+    };
+  } catch (error) {
+    logError(error, {
+      service: "web",
+      pathname: "/inbox",
+      component: "Inbox",
+    });
+  }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-api_data_completions-review.html">api/data/completions-review</a></li><li><a href="module-lib_backfilling.html">lib/backfilling</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#connectToDatabase">connectToDatabase</a></li><li><a href="global.html#cookiePolicyMap">cookiePolicyMap</a></li><li><a href="global.html#cosineSimilarity">cosineSimilarity</a></li><li><a href="global.html#cosineSimilarityScore">cosineSimilarityScore</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createPost">createPost</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deletePost">deletePost</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#dotProduct">dotProduct</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getCommentById">getCommentById</a></li><li><a href="global.html#getComments">getComments</a></li><li><a href="global.html#getCommentsByUserId">getCommentsByUserId</a></li><li><a href="global.html#getCommentsCollection">getCommentsCollection</a></li><li><a href="global.html#getCompletionsCollection">getCompletionsCollection</a></li><li><a href="global.html#getCosineSimilarityCollection">getCosineSimilarityCollection</a></li><li><a href="global.html#getInbox">getInbox</a></li><li><a href="global.html#getInboxCollection">getInboxCollection</a></li><li><a href="global.html#getInboxCount">getInboxCount</a></li><li><a href="global.html#getLatestPublicPosts">getLatestPublicPosts</a></li><li><a href="global.html#getMongoClient">getMongoClient</a></li><li><a href="global.html#getPostById">getPostById</a></li><li><a href="global.html#getPosts">getPosts</a></li><li><a href="global.html#getPostsCollection">getPostsCollection</a></li><li><a href="global.html#getPostsInsights">getPostsInsights</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getStar">getStar</a></li><li><a href="global.html#getStarredPosts">getStarredPosts</a></li><li><a href="global.html#getStarsByUserEmail">getStarsByUserEmail</a></li><li><a href="global.html#getStarsCollection">getStarsCollection</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnPost">hasAiCommentedOnPost</a></li><li><a href="global.html#hasCommentedOnPost">hasCommentedOnPost</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#magnitude">magnitude</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#privacyPolicyMap">privacyPolicyMap</a></li><li><a href="global.html#searchPosts">searchPosts</a></li><li><a href="global.html#starPost">starPost</a></li><li><a href="global.html#termsAndConditionsMap">termsAndConditionsMap</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#textToFreqMap">textToFreqMap</a></li><li><a href="global.html#unstarPost">unstarPost</a></li><li><a href="global.html#updatePost">updatePost</a></li><li><a href="global.html#updatePostVisibility">updatePostVisibility</a></li><li><a href="global.html#updateUser">updateUser</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Mar 29 2025 11:07:57 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
