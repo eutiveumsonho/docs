@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/db/account/writes.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/db/account/writes.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { ObjectID } from "bson";
+import {
+  getAccountsCollection,
+  getCommentsCollection,
+  getPostsCollection,
+  getStarsCollection,
+  getUsersCollection,
+} from "../mongodb";
+import {
+  getCommentsByUserId,
+  getStarsByUserEmail,
+  getUserByEmail,
+} from "../reads";
+import { deleteComment } from "../writes";
+import { unstarPost } from "../stars/writes";
+import { logError } from "../../o11y/log";
+
+/**
+ * Method responsible for deleting a user's account.
+ * This method is called when a user deletes their account.
+ * It deletes all dreams, comments and stars related to the user, and the user's account.
+ *
+ * @param {string} userEmail - The user's email
+ * @returns {Promise&lt;{ success: boolean }>}
+ */
+export async function deleteAccount(userEmail) {
+  const [
+    user,
+    usersCollection,
+    postsCollection,
+    accountsCollection,
+    commentsCollection,
+    starsCollection,
+  ] = await Promise.all([
+    getUserByEmail(userEmail),
+    getUsersCollection(),
+    getPostsCollection(),
+    getAccountsCollection(),
+    getCommentsCollection(),
+    getStarsCollection(),
+  ]);
+
+  if (!user) {
+    console.warn({
+      message: "No user found",
+      service: "db",
+      pathname: "deleteAccount",
+    });
+    return { success: false };
+  }
+
+  try {
+    const comments = await getCommentsByUserId(user._id);
+    const stars = await getStarsByUserEmail(user.email);
+
+    await Promise.all([
+      postsCollection.deleteMany({ userId: ObjectID(user._id) }),
+      accountsCollection.deleteOne({ userId: ObjectID(user._id) }),
+      usersCollection.deleteOne({ email: userEmail }),
+      // Delete all comments made on this user's posts.
+      commentsCollection.deleteMany({ dreamOwnerUserId: ObjectID(user._id) }),
+      // Delete all stars given to this user's posts.
+      starsCollection.deleteMany({ dreamOwnerUserId: ObjectID(user._id) }),
+    ]);
+
+    // Delete comments made on other people's posts and
+    // decrement the dream count accordingly.
+    for (const comment of comments) {
+      // Skip awaiting, update as many dream comment counts
+      // as possible as fast as possible.
+      deleteComment(comment._id, comment.dreamId);
+    }
+
+    for (const star of stars) {
+      unstarPost(star._id, star.dreamId);
+    }
+
+    return { success: true };
+  } catch (error) {
+    logError(error, {
+      service: "db",
+      component: "deleteAccount",
+    });
+    return { success: false };
+  }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-api_data_completions-review.html">api/data/completions-review</a></li><li><a href="module-lib_backfilling.html">lib/backfilling</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#connectToDatabase">connectToDatabase</a></li><li><a href="global.html#cookiePolicyMap">cookiePolicyMap</a></li><li><a href="global.html#cosineSimilarity">cosineSimilarity</a></li><li><a href="global.html#cosineSimilarityScore">cosineSimilarityScore</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createPost">createPost</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deletePost">deletePost</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#dotProduct">dotProduct</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getCommentById">getCommentById</a></li><li><a href="global.html#getComments">getComments</a></li><li><a href="global.html#getCommentsByUserId">getCommentsByUserId</a></li><li><a href="global.html#getCommentsCollection">getCommentsCollection</a></li><li><a href="global.html#getCompletionsCollection">getCompletionsCollection</a></li><li><a href="global.html#getCosineSimilarityCollection">getCosineSimilarityCollection</a></li><li><a href="global.html#getInbox">getInbox</a></li><li><a href="global.html#getInboxCollection">getInboxCollection</a></li><li><a href="global.html#getInboxCount">getInboxCount</a></li><li><a href="global.html#getLatestPublicPosts">getLatestPublicPosts</a></li><li><a href="global.html#getMongoClient">getMongoClient</a></li><li><a href="global.html#getPostById">getPostById</a></li><li><a href="global.html#getPosts">getPosts</a></li><li><a href="global.html#getPostsCollection">getPostsCollection</a></li><li><a href="global.html#getPostsInsights">getPostsInsights</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getStar">getStar</a></li><li><a href="global.html#getStarredPosts">getStarredPosts</a></li><li><a href="global.html#getStarsByUserEmail">getStarsByUserEmail</a></li><li><a href="global.html#getStarsCollection">getStarsCollection</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnPost">hasAiCommentedOnPost</a></li><li><a href="global.html#hasCommentedOnPost">hasCommentedOnPost</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#magnitude">magnitude</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#privacyPolicyMap">privacyPolicyMap</a></li><li><a href="global.html#searchPosts">searchPosts</a></li><li><a href="global.html#starPost">starPost</a></li><li><a href="global.html#termsAndConditionsMap">termsAndConditionsMap</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#textToFreqMap">textToFreqMap</a></li><li><a href="global.html#unstarPost">unstarPost</a></li><li><a href="global.html#updatePost">updatePost</a></li><li><a href="global.html#updatePostVisibility">updatePostVisibility</a></li><li><a href="global.html#updateUser">updateUser</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed May 28 2025 12:04:19 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
