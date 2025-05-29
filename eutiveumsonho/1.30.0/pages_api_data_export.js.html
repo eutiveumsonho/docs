@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: pages/api/data/index.js</title>
+    <title>JSDoc: Source: pages/api/data/export.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: pages/api/data/index.js</h1>
+    <h1 class="page-title">Source: pages/api/data/export.js</h1>
 
     
 
@@ -26,80 +26,42 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>/** @module pages/api/data */
+            <pre class="prettyprint source linenums"><code>/** @module pages/api/data/export */
 import { getServerSession } from "../../../lib/auth";
-import { getUserById, searchPosts } from "../../../lib/db/reads";
-import { createPost, deletePost, updatePost } from "../../../lib/db/writes";
+import { getPosts } from "../../../lib/db/posts/reads";
+import { getUserByEmail } from "../../../lib/db/reads";
+import { html } from "../../../lib/email";
 import {
-  BAD_REQUEST,
   METHOD_NOT_ALLOWED,
   SERVER_ERROR,
   FORBIDDEN,
 } from "../../../lib/errors";
 import { logError } from "../../../lib/o11y/log";
+import { createTransporter } from "nodemailer";
+import dayjs from "dayjs";
+import LocalizedFormat from "dayjs/plugin/localizedFormat";
+import "dayjs/locale/pt-br";
+import "dayjs/locale/en";
+import "dayjs/locale/es";
+import "dayjs/locale/fr";
+
+dayjs.extend(LocalizedFormat);
 
 /**
- * This is the main API route for getting, creating, updating, and deleting dreams.
- * It supports GET, POST, PATCH, and DELETE, allowing users to search for dreams,
- * create new dreams, update existing dreams, and delete dreams.
+ * API endpoint for exporting user dreams to email
+ * Supports POST method to send dreams export to user's email
  */
-function dataHandler(req, res) {
+function exportHandler(req, res) {
   switch (req.method) {
     case "POST":
       return post(req, res);
-    case "PATCH":
-      return patch(req, res);
-    case "DELETE":
-      return del(req, res);
-    case "GET":
-      return get(req, res);
     default:
-      res.setHeader("Allow", ["GET", "POST", "PATCH", "DELETE"]);
+      res.setHeader("Allow", ["POST"]);
       res.status(405).end(METHOD_NOT_ALLOWED);
       return res;
   }
 }
 
-async function patch(req, res) {
-  const session = await getServerSession(req, res);
-
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (
-    !req.body?.dreamData?.dream?.text ||
-    !req.body?.dreamData?.dream?.html ||
-    !req.body?.dreamId
-  ) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  try {
-    await updatePost(req.body.dreamId, req.body.dreamData, session.user.email);
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(200).end();
-
-    return res;
-  } catch (error) {
-    logError(error, {
-      service: "api",
-      pathname: "/api/data",
-      method: "patch",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
-  }
-}
-
-/**
- * This is called when a dream is saved
- * for the very first time.
- */
 async function post(req, res) {
   const session = await getServerSession(req, res);
 
@@ -108,26 +70,42 @@ async function post(req, res) {
     return res;
   }
 
-  if (!req.body?.dream?.text || !req.body?.dream?.html) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  const data = { dream: req.body, session };
-
   try {
-    const result = await createPost(data);
+    // Get user's dreams
+    const dreams = await getPosts(session.user.email);
 
-    const objectId = result.insertedId.toString();
+    if (!dreams || dreams.length === 0) {
+      res.status(400).json({ error: "No dreams found to export" });
+      return res;
+    }
+
+    // Get user info for personalization
+    const user = await getUserByEmail(session.user.email);
+
+    // Generate email content
+    const emailContent = generateEmailContent(
+      dreams,
+      user,
+      req.query.locale || "en"
+    );
+
+    // Send email
+    await sendExportEmail(
+      session.user.email,
+      emailContent,
+      req.query.locale || "en"
+    );
 
     res.setHeader("Content-Type", "application/json");
-    res.status(201).send({ objectId });
+    res
+      .status(200)
+      .json({ success: true, message: "Dreams exported successfully" });
 
     return res;
   } catch (error) {
     logError(error, {
       service: "api",
-      pathname: "/api/data",
+      pathname: "/api/data/export",
       method: "post",
     });
     res.status(500).end(SERVER_ERROR);
@@ -136,85 +114,180 @@ async function post(req, res) {
   }
 }
 
-async function del(req, res) {
-  const session = await getServerSession(req, res);
+function generateEmailContent(dreams, user, locale) {
+  const dreamsCount = dreams.length;
+  const totalWords = dreams.reduce((acc, dream) => {
+    return acc + (dream.characterCount || 0);
+  }, 0);
 
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
+  // Localized content
+  const content = getLocalizedContent(locale);
 
-  if (!req.body?.dreamId) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
+  let dreamsHtml = "";
 
+  dreams.forEach((dream, index) => {
+    const date = dayjs(dream.createdAt).locale(locale).format("LL");
+    const visibility = getVisibilityText(dream.visibility, locale);
+
+    dreamsHtml += `
+      &lt;div style="margin-bottom: 30px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        &lt;div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px;">
+          &lt;h3 style="margin: 0; color: #333; font-size: 16px;">${
+            content.dream
+          } #${index + 1}&lt;/h3>
+          &lt;div style="display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; color: #666;">
+            &lt;span>${date}&lt;/span>
+            &lt;span style="margin-top: 2px; font-style: italic;">${visibility}&lt;/span>
+          &lt;/div>
+        &lt;/div>
+        &lt;div style="line-height: 1.6; color: #333;">
+          ${dream.dream.html || dream.dream.text}
+        &lt;/div>
+      &lt;/div>
+    `;
+  });
+
+  const mainContent = `
+    &lt;h1 style="color: #3498db; text-align: center; margin-bottom: 30px;">${
+      content.title
+    }&lt;/h1>
+    
+    &lt;div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 30px;">
+      &lt;h2 style="color: #333; margin-top: 0; font-size: 18px;">${
+        content.summary
+      }&lt;/h2>
+      &lt;p style="margin: 10px 0;">&lt;strong>${
+        content.totalDreams
+      }:&lt;/strong> ${dreamsCount}&lt;/p>
+      &lt;p style="margin: 10px 0;">&lt;strong>${
+        content.totalCharacters
+      }:&lt;/strong> ${totalWords.toLocaleString()}&lt;/p>
+      &lt;p style="margin: 10px 0;">&lt;strong>${
+        content.exportDate
+      }:&lt;/strong> ${dayjs().locale(locale).format("LL")}&lt;/p>
+    &lt;/div>
+    
+    &lt;h2 style="color: #333; font-size: 18px; margin-bottom: 20px;">${
+      content.yourDreams
+    }&lt;/h2>
+    
+    ${dreamsHtml}
+    
+    &lt;div style="margin-top: 40px; padding: 20px; background-color: #f8f9fa; border-radius: 5px; text-align: center;">
+      &lt;p style="margin: 0; color: #666; font-style: italic;">${
+        content.footer
+      }&lt;/p>
+    &lt;/div>
+  `;
+
+  return html(mainContent, content.emailTitle, null, locale);
+}
+
+function getLocalizedContent(locale) {
+  const translations = {
+    en: {
+      title: "Your Dreams Export",
+      emailTitle: "Dreams Export - Eu Tive Um Sonho",
+      summary: "Export Summary",
+      totalDreams: "Total Dreams",
+      totalCharacters: "Total Characters",
+      exportDate: "Export Date",
+      yourDreams: "Your Dreams",
+      dream: "Dream",
+      footer: "Keep dreaming and sharing your experiences with our community!",
+      private: "Private",
+      public: "Public",
+      anonymous: "Anonymous",
+    },
+    pt: {
+      title: "Exportação dos Seus Sonhos",
+      emailTitle: "Exportação de Sonhos - Eu Tive Um Sonho",
+      summary: "Resumo da Exportação",
+      totalDreams: "Total de Sonhos",
+      totalCharacters: "Total de Caracteres",
+      exportDate: "Data da Exportação",
+      yourDreams: "Seus Sonhos",
+      dream: "Sonho",
+      footer:
+        "Continue sonhando e compartilhando suas experiências com nossa comunidade!",
+      private: "Privado",
+      public: "Público",
+      anonymous: "Anônimo",
+    },
+    es: {
+      title: "Exportación de Tus Sueños",
+      emailTitle: "Exportación de Sueños - Eu Tive Um Sonho",
+      summary: "Resumen de Exportación",
+      totalDreams: "Total de Sueños",
+      totalCharacters: "Total de Caracteres",
+      exportDate: "Fecha de Exportación",
+      yourDreams: "Tus Sueños",
+      dream: "Sueño",
+      footer:
+        "¡Sigue soñando y compartiendo tus experiencias con nuestra comunidad!",
+      private: "Privado",
+      public: "Público",
+      anonymous: "Anónimo",
+    },
+    fr: {
+      title: "Exportation de Vos Rêves",
+      emailTitle: "Exportation de Rêves - Eu Tive Um Sonho",
+      summary: "Résumé d'Exportation",
+      totalDreams: "Total des Rêves",
+      totalCharacters: "Total des Caractères",
+      exportDate: "Date d'Exportation",
+      yourDreams: "Vos Rêves",
+      dream: "Rêve",
+      footer:
+        "Continuez à rêver et à partager vos expériences avec notre communauté!",
+      private: "Privé",
+      public: "Public",
+      anonymous: "Anonyme",
+    },
+  };
+
+  return translations[locale] || translations.en;
+}
+
+function getVisibilityText(visibility, locale) {
+  const content = getLocalizedContent(locale);
+  return content[visibility] || visibility;
+}
+
+async function sendExportEmail(email, htmlContent, locale) {
   try {
-    const result = await deletePost(req.body.dreamId);
+    // Create transporter (using same config as existing email system)
+    const transporter = createTransporter({
+      host: process.env.EMAIL_SERVER_HOST,
+      port: process.env.EMAIL_SERVER_PORT,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_SERVER_USER,
+        pass: process.env.EMAIL_SERVER_PASSWORD,
+      },
+    });
 
-    res.setHeader("Content-Type", "application/json");
-    res.status(200).send(result);
+    const content = getLocalizedContent(locale);
 
-    return res;
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: content.emailTitle,
+      html: htmlContent,
+    };
+
+    await transporter.sendMail(mailOptions);
   } catch (error) {
     logError(error, {
-      service: "api",
-      pathname: "/api/data",
-      method: "delete",
+      service: "email",
+      action: "sendExportEmail",
+      email,
     });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
+    throw new Error("Failed to send export email");
   }
 }
 
-async function get(req, res) {
-  const session = await getServerSession(req, res);
-
-  if (!session) {
-    res.status(403).end(FORBIDDEN);
-    return res;
-  }
-
-  if (!req.query?.query) {
-    res.status(400).end(BAD_REQUEST);
-    return res;
-  }
-
-  try {
-    const result = await searchPosts(req.query.query);
-
-    const dreams = [];
-
-    for (let dream of result) {
-      if (dream.visibility === "anonymous") {
-        delete dream.userId;
-        dreams.push(dream);
-        continue;
-      }
-
-      const user = await getUserById(dream.userId);
-      dream.user = user;
-      dreams.push(dream);
-    }
-
-    res.setHeader("Content-Type", "application/json");
-    res.status(201).send(dreams);
-
-    return res;
-  } catch (error) {
-    logError(error, {
-      service: "api",
-      pathname: "/api/data",
-      method: "get",
-    });
-    res.status(500).end(SERVER_ERROR);
-
-    return res;
-  }
-}
-
-export default dataHandler;
+export default exportHandler;
 </code></pre>
         </article>
     </section>
