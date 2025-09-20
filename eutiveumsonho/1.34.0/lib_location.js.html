@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/location.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/location.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Utility functions for handling location data from various sources
+ */
+
+/**
+ * Extract location information from request headers
+ * This provides a fallback when user doesn't grant geolocation permission
+ * @param {Object} req - Next.js request object
+ * @returns {Object|null} Location data from headers or null
+ */
+export function inferLocationFromHeaders(req) {
+  try {
+    // Check common location headers set by CDNs and proxies
+    const country = req.headers['cf-ipcountry'] || // Cloudflare
+                   req.headers['x-country-code'] || // Common proxy header
+                   req.headers['x-geo-country']; // Another common header
+
+    const region = req.headers['cf-region'] || 
+                  req.headers['x-region-code'] ||
+                  req.headers['x-geo-region'];
+
+    const city = req.headers['cf-ipcity'] || 
+                req.headers['x-city'] ||
+                req.headers['x-geo-city'];
+
+    const timezone = req.headers['cf-timezone'] ||
+                    req.headers['x-timezone'];
+
+    // Get IP address for logging purposes (not stored)
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] ||
+              req.headers['x-real-ip'] ||
+              req.connection?.remoteAddress;
+
+    // Only return data if we have at least country information
+    if (country) {
+      return {
+        type: 'inferred',
+        country: country,
+        region: region || null,
+        city: city || null,
+        timezone: timezone || null,
+        timestamp: new Date().toISOString(),
+        source: 'headers'
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error inferring location from headers:', error);
+    return null;
+  }
+}
+
+/**
+ * Validate and sanitize client-provided location data
+ * @param {Object} locationData - Location data from client
+ * @returns {Object|null} Validated location data or null
+ */
+export function validateLocationData(locationData) {
+  if (!locationData || typeof locationData !== 'object') {
+    return null;
+  }
+
+  try {
+    const { latitude, longitude, accuracy, timestamp } = locationData;
+
+    // Validate latitude and longitude
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      return null;
+    }
+
+    // Check if coordinates are within valid ranges
+    if (latitude &lt; -90 || latitude > 90 || longitude &lt; -180 || longitude > 180) {
+      return null;
+    }
+
+    // Validate accuracy if provided
+    if (accuracy !== undefined &amp;&amp; (typeof accuracy !== 'number' || accuracy &lt; 0)) {
+      return null;
+    }
+
+    // Validate timestamp
+    if (timestamp &amp;&amp; isNaN(new Date(timestamp).getTime())) {
+      return null;
+    }
+
+    return {
+      type: 'precise',
+      latitude: Number(latitude.toFixed(6)), // Limit precision for privacy
+      longitude: Number(longitude.toFixed(6)),
+      accuracy: accuracy ? Math.round(accuracy) : null,
+      timestamp: timestamp || new Date().toISOString(),
+      source: 'geolocation'
+    };
+  } catch (error) {
+    console.error('Error validating location data:', error);
+    return null;
+  }
+}
+
+/**
+ * Combine client location with server-inferred location
+ * Prioritizes precise client location over inferred location
+ * @param {Object} clientLocation - Location from client geolocation
+ * @param {Object} inferredLocation - Location from request headers
+ * @returns {Object|null} Best available location data
+ */
+export function combineLocationData(clientLocation, inferredLocation) {
+  const validClientLocation = validateLocationData(clientLocation);
+  
+  if (validClientLocation) {
+    return validClientLocation;
+  }
+  
+  return inferredLocation;
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-api_data_completions-review.html">api/data/completions-review</a></li><li><a href="module-lib_backfilling.html">lib/backfilling</a></li><li><a href="module-lib_db_writes.html">lib/db/writes</a></li><li><a href="module-pages.html">pages</a></li><li><a href="module-pages_api_account.html">pages/api/account</a></li><li><a href="module-pages_api_auth_error.html">pages/api/auth/error</a></li><li><a href="module-pages_api_auth_signin.html">pages/api/auth/signin</a></li><li><a href="module-pages_api_auth_verify-request.html">pages/api/auth/verify-request</a></li><li><a href="module-pages_api_data.html">pages/api/data</a></li><li><a href="module-pages_api_data_ai-comments.html">pages/api/data/ai-comments</a></li><li><a href="module-pages_api_data_comments.html">pages/api/data/comments</a></li><li><a href="module-pages_api_data_export.html">pages/api/data/export</a></li><li><a href="module-pages_api_data_inbox.html">pages/api/data/inbox</a></li><li><a href="module-pages_api_data_publish.html">pages/api/data/publish</a></li><li><a href="module-pages_api_data_stars.html">pages/api/data/stars</a></li><li><a href="module-pages_api_public-dreams.html">pages/api/public-dreams</a></li><li><a href="module-pages_dreams.html">pages/dreams</a></li><li><a href="module-pages_dreams__dreamId.html">pages/dreams/:dreamId</a></li><li><a href="module-pages_publish.html">pages/publish</a></li><li><a href="module-pages_publish__postId.html">pages/publish/:postId</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ENCRYPTION_KEY">ENCRYPTION_KEY</a></li><li><a href="global.html#Editor">Editor</a></li><li><a href="global.html#MainNavigation">MainNavigation</a></li><li><a href="global.html#addMissingAICommentData">addMissingAICommentData</a></li><li><a href="global.html#addMissingWordFreqData">addMissingWordFreqData</a></li><li><a href="global.html#combineLocationData">combineLocationData</a></li><li><a href="global.html#connectToDatabase">connectToDatabase</a></li><li><a href="global.html#cookiePolicyMap">cookiePolicyMap</a></li><li><a href="global.html#cosineSimilarity">cosineSimilarity</a></li><li><a href="global.html#cosineSimilarityScore">cosineSimilarityScore</a></li><li><a href="global.html#createComment">createComment</a></li><li><a href="global.html#createPost">createPost</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#deleteAllInboxMessages">deleteAllInboxMessages</a></li><li><a href="global.html#deleteComment">deleteComment</a></li><li><a href="global.html#deletePost">deletePost</a></li><li><a href="global.html#deleteSomeInboxMessages">deleteSomeInboxMessages</a></li><li><a href="global.html#detectClusterCategory">detectClusterCategory</a></li><li><a href="global.html#dotProduct">dotProduct</a></li><li><a href="global.html#generateUrlLoc">generateUrlLoc</a></li><li><a href="global.html#getAccountsCollection">getAccountsCollection</a></li><li><a href="global.html#getAuthProps">getAuthProps</a></li><li><a href="global.html#getCommandOptionValue">getCommandOptionValue</a></li><li><a href="global.html#getCommentById">getCommentById</a></li><li><a href="global.html#getComments">getComments</a></li><li><a href="global.html#getCommentsByUserId">getCommentsByUserId</a></li><li><a href="global.html#getCommentsCollection">getCommentsCollection</a></li><li><a href="global.html#getCompletionsCollection">getCompletionsCollection</a></li><li><a href="global.html#getCosineSimilarityCollection">getCosineSimilarityCollection</a></li><li><a href="global.html#getEnhancedSemanticClusters">getEnhancedSemanticClusters</a></li><li><a href="global.html#getInbox">getInbox</a></li><li><a href="global.html#getInboxCollection">getInboxCollection</a></li><li><a href="global.html#getInboxCount">getInboxCount</a></li><li><a href="global.html#getLatestPublicPosts">getLatestPublicPosts</a></li><li><a href="global.html#getMongoClient">getMongoClient</a></li><li><a href="global.html#getPostById">getPostById</a></li><li><a href="global.html#getPosts">getPosts</a></li><li><a href="global.html#getPostsCollection">getPostsCollection</a></li><li><a href="global.html#getPostsCount">getPostsCount</a></li><li><a href="global.html#getPostsInsights">getPostsInsights</a></li><li><a href="global.html#getProfileByUserId">getProfileByUserId</a></li><li><a href="global.html#getProfileByUsername">getProfileByUsername</a></li><li><a href="global.html#getPublicPostsCount">getPublicPostsCount</a></li><li><a href="global.html#getShortcutString">getShortcutString</a></li><li><a href="global.html#getStar">getStar</a></li><li><a href="global.html#getStarredPosts">getStarredPosts</a></li><li><a href="global.html#getStarsByUserEmail">getStarsByUserEmail</a></li><li><a href="global.html#getStarsCollection">getStarsCollection</a></li><li><a href="global.html#getUiShortcutString">getUiShortcutString</a></li><li><a href="global.html#getUserByEmail">getUserByEmail</a></li><li><a href="global.html#getUserById">getUserById</a></li><li><a href="global.html#getUsersCollection">getUsersCollection</a></li><li><a href="global.html#hasAiCommentedOnPost">hasAiCommentedOnPost</a></li><li><a href="global.html#hasCommentedOnPost">hasCommentedOnPost</a></li><li><a href="global.html#hitChiron">hitChiron</a></li><li><a href="global.html#inferLocationFromHeaders">inferLocationFromHeaders</a></li><li><a href="global.html#isStringArray">isStringArray</a></li><li><a href="global.html#isUsernameAvailable">isUsernameAvailable</a></li><li><a href="global.html#magnitude">magnitude</a></li><li><a href="global.html#markAllInboxMessagesAsRead">markAllInboxMessagesAsRead</a></li><li><a href="global.html#markSomeInboxMessagesAsRead">markSomeInboxMessagesAsRead</a></li><li><a href="global.html#privacyPolicyMap">privacyPolicyMap</a></li><li><a href="global.html#searchPosts">searchPosts</a></li><li><a href="global.html#setUsername">setUsername</a></li><li><a href="global.html#starPost">starPost</a></li><li><a href="global.html#termsAndConditionsMap">termsAndConditionsMap</a></li><li><a href="global.html#text">text</a></li><li><a href="global.html#textToFreqMap">textToFreqMap</a></li><li><a href="global.html#unstarPost">unstarPost</a></li><li><a href="global.html#updatePost">updatePost</a></li><li><a href="global.html#updatePostVisibility">updatePostVisibility</a></li><li><a href="global.html#updateProfile">updateProfile</a></li><li><a href="global.html#updateUser">updateUser</a></li><li><a href="global.html#useGeolocation">useGeolocation</a></li><li><a href="global.html#validateLocationData">validateLocationData</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Sep 20 2025 06:26:43 GMT+0000 (Coordinated Universal Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
